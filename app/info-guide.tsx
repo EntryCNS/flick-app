@@ -5,18 +5,44 @@ import {
   Animated,
   TouchableOpacity,
   Linking,
+  View,
+  Text,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
 } from "react-native";
-import styled from "@emotion/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { COLORS } from "@/constants/colors";
 
-export default function InfoGuideScreen() {
+// Type definitions
+interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+interface NoticeItem {
+  id: string;
+  title: string;
+  date: string;
+  content: string;
+  isImportant: boolean;
+}
+
+interface DirectionIconProps {
+  bgColor: string;
+  iconColor: string;
+  iconName: keyof typeof Ionicons.glyphMap;
+}
+
+export default function InfoGuideScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
-  const [expandedFaq, setExpandedFaq] = useState(null);
+  const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
 
-  const faqData = [
+  const faqData: FaqItem[] = [
     {
       id: "1",
       question: "포인트는 어떻게 충전하나요?",
@@ -49,7 +75,7 @@ export default function InfoGuideScreen() {
     },
   ];
 
-  const noticeData = [
+  const noticeData: NoticeItem[] = [
     {
       id: "1",
       title: "[공지] 우천 시 행사 진행 안내",
@@ -75,7 +101,7 @@ export default function InfoGuideScreen() {
     },
   ];
 
-  const toggleFaq = (id) => {
+  const toggleFaq = (id: string): void => {
     if (expandedFaq === id) {
       setExpandedFaq(null);
     } else {
@@ -86,12 +112,23 @@ export default function InfoGuideScreen() {
   const contactPhoneNumber = "010-1234-5678";
   const emergencyNumber = "010-9876-5432";
 
-  const handlePhoneCall = (phoneNumber: string) => {
+  const handlePhoneCall = (phoneNumber: string): void => {
     Linking.openURL(`tel:${phoneNumber}`);
   };
 
+  // Helper function for info section icons
+  const renderInfoIcon = ({
+    bgColor,
+    iconColor,
+    iconName,
+  }: DirectionIconProps): React.ReactElement => (
+    <View style={[styles.infoIconContainer, { backgroundColor: bgColor }]}>
+      <Ionicons name={iconName} size={20} color={iconColor} />
+    </View>
+  );
+
   return (
-    <Container style={{ paddingTop: insets.top }}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar
         barStyle="dark-content"
         backgroundColor="transparent"
@@ -108,19 +145,22 @@ export default function InfoGuideScreen() {
           zIndex: 10,
           shadowOffset: { width: 0, height: 2 },
           shadowRadius: 8,
-          shadowColor: "#000000",
-          backgroundColor: "white",
+          shadowColor: COLORS.black,
+          backgroundColor: COLORS.white,
         }}
       >
-        <Header>
-          <BackButton onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#222222" />
-          </BackButton>
-          <HeaderTitle>안내</HeaderTitle>
-          <IconButton>
-            <Ionicons name="bookmark-outline" size={22} color="#222222" />
-          </IconButton>
-        </Header>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>안내</Text>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="bookmark-outline" size={22} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       <ScrollView
@@ -132,534 +172,537 @@ export default function InfoGuideScreen() {
         )}
         scrollEventThrottle={16}
       >
-        <InfoSection>
-          <SectionTitle>행사 정보</SectionTitle>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>행사 정보</Text>
 
-          <InfoCard>
-            <InfoItem>
-              <InfoIconContainer style={{ backgroundColor: "#EEF2FF" }}>
-                <Ionicons name="calendar" size={20} color="#315DE7" />
-              </InfoIconContainer>
-              <InfoContent>
-                <InfoLabel>행사 기간</InfoLabel>
-                <InfoText>2025.04.20 ~ 2025.04.26</InfoText>
-              </InfoContent>
-            </InfoItem>
+          <View style={styles.infoCard}>
+            <View style={styles.infoItem}>
+              {renderInfoIcon({
+                bgColor: COLORS.primary50,
+                iconColor: COLORS.primary600,
+                iconName: "calendar",
+              })}
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>행사 기간</Text>
+                <Text style={styles.infoText}>2025.04.20 ~ 2025.04.26</Text>
+              </View>
+            </View>
 
-            <Separator />
+            <View style={styles.separator} />
 
-            <InfoItem>
-              <InfoIconContainer style={{ backgroundColor: "#F2F7F2" }}>
-                <Ionicons name="time" size={20} color="#067A49" />
-              </InfoIconContainer>
-              <InfoContent>
-                <InfoLabel>운영 시간</InfoLabel>
-                <InfoText>10:00 ~ 20:00</InfoText>
-              </InfoContent>
-            </InfoItem>
+            <View style={styles.infoItem}>
+              {renderInfoIcon({
+                bgColor: COLORS.success50,
+                iconColor: COLORS.success600,
+                iconName: "time",
+              })}
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>운영 시간</Text>
+                <Text style={styles.infoText}>10:00 ~ 20:00</Text>
+              </View>
+            </View>
 
-            <Separator />
+            <View style={styles.separator} />
 
-            <InfoItem>
-              <InfoIconContainer style={{ backgroundColor: "#FFF3E8" }}>
-                <Ionicons name="location" size={20} color="#FF571A" />
-              </InfoIconContainer>
-              <InfoContent>
-                <InfoLabel>행사 장소</InfoLabel>
-                <InfoText>서울시 강남구 영동대로 513</InfoText>
-              </InfoContent>
-            </InfoItem>
+            <View style={styles.infoItem}>
+              {renderInfoIcon({
+                bgColor: COLORS.warning50,
+                iconColor: COLORS.warning600,
+                iconName: "location",
+              })}
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>행사 장소</Text>
+                <Text style={styles.infoText}>서울시 강남구 영동대로 513</Text>
+              </View>
+            </View>
 
-            <Separator />
+            <View style={styles.separator} />
 
-            <InfoItem>
-              <InfoIconContainer style={{ backgroundColor: "#F4F2FF" }}>
-                <Ionicons name="people" size={20} color="#7F6BFF" />
-              </InfoIconContainer>
-              <InfoContent>
-                <InfoLabel>주최/주관</InfoLabel>
-                <InfoText>플릭 페스티벌 운영 위원회</InfoText>
-              </InfoContent>
-            </InfoItem>
-          </InfoCard>
-        </InfoSection>
+            <View style={styles.infoItem}>
+              {renderInfoIcon({
+                bgColor: COLORS.info50,
+                iconColor: COLORS.info600,
+                iconName: "people",
+              })}
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>주최/주관</Text>
+                <Text style={styles.infoText}>플릭 페스티벌 운영 위원회</Text>
+              </View>
+            </View>
+          </View>
+        </View>
 
-        <ContactSection>
-          <SectionTitle>연락처</SectionTitle>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>연락처</Text>
 
-          <ContactCard>
-            <ContactItem onPress={() => handlePhoneCall(contactPhoneNumber)}>
-              <ContactIconContainer style={{ backgroundColor: "#FFF3E8" }}>
-                <Ionicons name="call" size={20} color="#FF571A" />
-              </ContactIconContainer>
-              <ContactInfo>
-                <ContactLabel>안내 센터</ContactLabel>
-                <ContactText>{contactPhoneNumber}</ContactText>
-              </ContactInfo>
-              <CallButton>
-                <Ionicons name="call-outline" size={18} color="#FFFFFF" />
-              </CallButton>
-            </ContactItem>
+          <View style={styles.contactCard}>
+            <TouchableOpacity
+              style={styles.contactItem}
+              onPress={() => handlePhoneCall(contactPhoneNumber)}
+            >
+              <View
+                style={[
+                  styles.contactIconContainer,
+                  { backgroundColor: COLORS.warning50 },
+                ]}
+              >
+                <Ionicons name="call" size={20} color={COLORS.warning600} />
+              </View>
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactLabel}>안내 센터</Text>
+                <Text style={styles.contactText}>{contactPhoneNumber}</Text>
+              </View>
+              <View style={styles.callButton}>
+                <Ionicons name="call-outline" size={18} color={COLORS.white} />
+              </View>
+            </TouchableOpacity>
 
-            <Separator />
+            <View style={styles.separator} />
 
-            <ContactItem onPress={() => handlePhoneCall(emergencyNumber)}>
-              <ContactIconContainer style={{ backgroundColor: "#FFF0F3" }}>
-                <Ionicons name="medkit" size={20} color="#FF2D55" />
-              </ContactIconContainer>
-              <ContactInfo>
-                <ContactLabel>응급 상황</ContactLabel>
-                <ContactText>{emergencyNumber}</ContactText>
-              </ContactInfo>
-              <CallButton style={{ backgroundColor: "#FF2D55" }}>
-                <Ionicons name="call-outline" size={18} color="#FFFFFF" />
-              </CallButton>
-            </ContactItem>
-          </ContactCard>
-        </ContactSection>
+            <TouchableOpacity
+              style={styles.contactItem}
+              onPress={() => handlePhoneCall(emergencyNumber)}
+            >
+              <View
+                style={[
+                  styles.contactIconContainer,
+                  { backgroundColor: COLORS.danger50 },
+                ]}
+              >
+                <Ionicons name="medkit" size={20} color={COLORS.danger600} />
+              </View>
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactLabel}>응급 상황</Text>
+                <Text style={styles.contactText}>{emergencyNumber}</Text>
+              </View>
+              <View
+                style={[
+                  styles.callButton,
+                  { backgroundColor: COLORS.danger600 },
+                ]}
+              >
+                <Ionicons name="call-outline" size={18} color={COLORS.white} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <NoticeSection>
-          <SectionTitle>공지사항</SectionTitle>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>공지사항</Text>
 
           {noticeData.map((notice) => (
-            <NoticeCard key={notice.id} important={notice.isImportant}>
-              <NoticeHeader>
-                <NoticeTitle important={notice.isImportant}>
+            <View
+              key={notice.id}
+              style={[
+                styles.noticeCard,
+                notice.isImportant && styles.noticeCardImportant,
+              ]}
+            >
+              <View style={styles.noticeHeader}>
+                <Text
+                  style={[
+                    styles.noticeTitle,
+                    notice.isImportant && styles.noticeTitleImportant,
+                  ]}
+                >
                   {notice.title}
-                </NoticeTitle>
-                <NoticeDate>{notice.date}</NoticeDate>
-              </NoticeHeader>
-              <NoticeContent>{notice.content}</NoticeContent>
-            </NoticeCard>
+                </Text>
+                <Text style={styles.noticeDate}>{notice.date}</Text>
+              </View>
+              <Text style={styles.noticeContent}>{notice.content}</Text>
+            </View>
           ))}
 
-          <ViewAllButton>
-            <ViewAllText>전체 공지사항 보기</ViewAllText>
-            <Ionicons name="chevron-forward" size={16} color="#666666" />
-          </ViewAllButton>
-        </NoticeSection>
+          <TouchableOpacity style={styles.viewAllButton}>
+            <Text style={styles.viewAllText}>전체 공지사항 보기</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+          </TouchableOpacity>
+        </View>
 
-        <FaqSection>
-          <SectionTitle>자주 묻는 질문</SectionTitle>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>자주 묻는 질문</Text>
 
           {faqData.map((faq) => (
-            <FaqCard key={faq.id}>
-              <FaqQuestionRow onPress={() => toggleFaq(faq.id)}>
-                <QuestionIcon>
-                  <QuestionText>Q</QuestionText>
-                </QuestionIcon>
-                <FaqQuestion>{faq.question}</FaqQuestion>
+            <View key={faq.id} style={styles.faqCard}>
+              <TouchableOpacity
+                style={styles.faqQuestionRow}
+                onPress={() => toggleFaq(faq.id)}
+              >
+                <View style={styles.questionIcon}>
+                  <Text style={styles.questionText}>Q</Text>
+                </View>
+                <Text style={styles.faqQuestion}>{faq.question}</Text>
                 <Ionicons
                   name={expandedFaq === faq.id ? "chevron-up" : "chevron-down"}
                   size={18}
-                  color="#888888"
+                  color={COLORS.gray400}
                 />
-              </FaqQuestionRow>
+              </TouchableOpacity>
 
               {expandedFaq === faq.id && (
-                <FaqAnswerContainer>
-                  <AnswerIcon>
-                    <AnswerText>A</AnswerText>
-                  </AnswerIcon>
-                  <FaqAnswer>{faq.answer}</FaqAnswer>
-                </FaqAnswerContainer>
+                <View style={styles.faqAnswerContainer}>
+                  <View style={styles.answerIcon}>
+                    <Text style={styles.answerText}>A</Text>
+                  </View>
+                  <Text style={styles.faqAnswer}>{faq.answer}</Text>
+                </View>
               )}
-            </FaqCard>
+            </View>
           ))}
 
-          <ViewAllButton>
-            <ViewAllText>전체 FAQ 보기</ViewAllText>
-            <Ionicons name="chevron-forward" size={16} color="#666666" />
-          </ViewAllButton>
-        </FaqSection>
+          <TouchableOpacity style={styles.viewAllButton}>
+            <Text style={styles.viewAllText}>전체 FAQ 보기</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+          </TouchableOpacity>
+        </View>
 
-        <MapSection>
-          <SectionTitle>찾아오시는 길</SectionTitle>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>찾아오시는 길</Text>
 
-          <MapCard>
-            <MapPlaceholder>
-              <Ionicons name="map" size={32} color="#888888" />
-              <MapPlaceholderText>지도 영역</MapPlaceholderText>
-            </MapPlaceholder>
+          <View style={styles.mapCard}>
+            <View style={styles.mapPlaceholder}>
+              <Ionicons name="map" size={32} color={COLORS.gray400} />
+              <Text style={styles.mapPlaceholderText}>지도 영역</Text>
+            </View>
 
-            <DirectionsContainer>
-              <DirectionItem>
-                <DirectionIconContainer style={{ backgroundColor: "#EEF2FF" }}>
-                  <Ionicons name="subway" size={18} color="#315DE7" />
-                </DirectionIconContainer>
-                <DirectionText>
-                  <DirectionTitle>지하철</DirectionTitle>
-                  <DirectionDetail>
+            <View style={styles.directionsContainer}>
+              <View style={styles.directionItem}>
+                <View
+                  style={[
+                    styles.directionIconContainer,
+                    { backgroundColor: COLORS.primary50 },
+                  ]}
+                >
+                  <Ionicons name="subway" size={18} color={COLORS.primary600} />
+                </View>
+                <View style={styles.directionText}>
+                  <Text style={styles.directionTitle}>지하철</Text>
+                  <Text style={styles.directionDetail}>
                     2호선 강남역 4번 출구에서 도보 5분
-                  </DirectionDetail>
-                </DirectionText>
-              </DirectionItem>
+                  </Text>
+                </View>
+              </View>
 
-              <DirectionItem>
-                <DirectionIconContainer style={{ backgroundColor: "#F2F7F2" }}>
-                  <Ionicons name="bus" size={18} color="#067A49" />
-                </DirectionIconContainer>
-                <DirectionText>
-                  <DirectionTitle>버스</DirectionTitle>
-                  <DirectionDetail>
+              <View style={styles.directionItem}>
+                <View
+                  style={[
+                    styles.directionIconContainer,
+                    { backgroundColor: COLORS.success50 },
+                  ]}
+                >
+                  <Ionicons name="bus" size={18} color={COLORS.success600} />
+                </View>
+                <View style={styles.directionText}>
+                  <Text style={styles.directionTitle}>버스</Text>
+                  <Text style={styles.directionDetail}>
                     간선: 145, 341, 472 / 지선: 4312
-                  </DirectionDetail>
-                </DirectionText>
-              </DirectionItem>
+                  </Text>
+                </View>
+              </View>
 
-              <DirectionItem>
-                <DirectionIconContainer style={{ backgroundColor: "#FFF3E8" }}>
-                  <Ionicons name="car" size={18} color="#FF571A" />
-                </DirectionIconContainer>
-                <DirectionText>
-                  <DirectionTitle>주차</DirectionTitle>
-                  <DirectionDetail>
+              <View style={styles.directionItem}>
+                <View
+                  style={[
+                    styles.directionIconContainer,
+                    { backgroundColor: COLORS.warning50 },
+                  ]}
+                >
+                  <Ionicons name="car" size={18} color={COLORS.warning600} />
+                </View>
+                <View style={styles.directionText}>
+                  <Text style={styles.directionTitle}>주차</Text>
+                  <Text style={styles.directionDetail}>
                     행사장 지하 주차장 이용 (3시간 무료)
-                  </DirectionDetail>
-                </DirectionText>
-              </DirectionItem>
-            </DirectionsContainer>
-          </MapCard>
-        </MapSection>
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
       </ScrollView>
-    </Container>
+    </View>
   );
 }
 
-const Container = styled.View`
-  flex: 1;
-  background-color: #fcfcfc;
-`;
-
-const Header = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  background-color: #ffffff;
-`;
-
-const BackButton = styled.TouchableOpacity`
-  width: 38px;
-  height: 38px;
-  justify-content: center;
-  align-items: center;
-`;
-
-const HeaderTitle = styled.Text`
-  font-size: 18px;
-  font-weight: 600;
-  color: #222222;
-`;
-
-const IconButton = styled.TouchableOpacity`
-  width: 38px;
-  height: 38px;
-  justify-content: center;
-  align-items: center;
-`;
-
-const InfoSection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-`;
-
-const ContactSection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-`;
-
-const NoticeSection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-`;
-
-const FaqSection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-`;
-
-const MapSection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-`;
-
-const SectionTitle = styled.Text`
-  font-size: 18px;
-  font-weight: 700;
-  color: #222222;
-  letter-spacing: -0.3px;
-  margin-bottom: 16px;
-`;
-
-const InfoCard = styled.View`
-  background-color: #ffffff;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid #f2f2f7;
-  padding: 8px 0;
-`;
-
-const InfoItem = styled.View`
-  flex-direction: row;
-  padding: 12px 16px;
-  align-items: center;
-`;
-
-const InfoIconContainer = styled.View`
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  justify-content: center;
-  align-items: center;
-`;
-
-const InfoContent = styled.View`
-  margin-left: 16px;
-`;
-
-const InfoLabel = styled.Text`
-  font-size: 14px;
-  color: #888888;
-  margin-bottom: 4px;
-`;
-
-const InfoText = styled.Text`
-  font-size: 16px;
-  font-weight: 500;
-  color: #222222;
-`;
-
-const Separator = styled.View`
-  height: 1px;
-  background-color: #f5f5f5;
-  margin-left: 72px;
-`;
-
-const ContactCard = styled.View`
-  background-color: #ffffff;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid #f2f2f7;
-  padding: 8px 0;
-`;
-
-const ContactItem = styled.TouchableOpacity`
-  flex-direction: row;
-  padding: 12px 16px;
-  align-items: center;
-`;
-
-const ContactIconContainer = styled.View`
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  justify-content: center;
-  align-items: center;
-`;
-
-const ContactInfo = styled.View`
-  flex: 1;
-  margin-left: 16px;
-`;
-
-const ContactLabel = styled.Text`
-  font-size: 14px;
-  color: #888888;
-  margin-bottom: 4px;
-`;
-
-const ContactText = styled.Text`
-  font-size: 16px;
-  font-weight: 500;
-  color: #222222;
-`;
-
-const CallButton = styled.View`
-  width: 36px;
-  height: 36px;
-  border-radius: 18px;
-  background-color: #315de7;
-  justify-content: center;
-  align-items: center;
-`;
-
-interface NoticeProps {
-  important?: boolean;
-}
-
-const NoticeCard = styled.View<NoticeProps>`
-  background-color: ${(props) => (props.important ? "#FFF8ED" : "#FFFFFF")};
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid ${(props) => (props.important ? "#FFE4C4" : "#F2F2F7")};
-  padding: 16px;
-  margin-bottom: 12px;
-`;
-
-const NoticeHeader = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-`;
-
-const NoticeTitle = styled.Text<NoticeProps>`
-  font-size: 16px;
-  font-weight: 600;
-  color: ${(props) => (props.important ? "#FF9500" : "#222222")};
-`;
-
-const NoticeDate = styled.Text`
-  font-size: 12px;
-  color: #888888;
-`;
-
-const NoticeContent = styled.Text`
-  font-size: 14px;
-  color: #444444;
-  line-height: 20px;
-`;
-
-const ViewAllButton = styled.TouchableOpacity`
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  padding: 12px;
-  margin-top: 8px;
-`;
-
-const ViewAllText = styled.Text`
-  font-size: 14px;
-  font-weight: 500;
-  color: #666666;
-  margin-right: 4px;
-`;
-
-const FaqCard = styled.View`
-  background-color: #ffffff;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid #f2f2f7;
-  margin-bottom: 12px;
-`;
-
-const FaqQuestionRow = styled.TouchableOpacity`
-  flex-direction: row;
-  padding: 16px;
-  align-items: center;
-`;
-
-const QuestionIcon = styled.View`
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
-  background-color: #315de7;
-  justify-content: center;
-  align-items: center;
-  margin-right: 12px;
-`;
-
-const QuestionText = styled.Text`
-  font-size: 14px;
-  font-weight: 600;
-  color: #ffffff;
-`;
-
-const FaqQuestion = styled.Text`
-  flex: 1;
-  font-size: 15px;
-  font-weight: 500;
-  color: #222222;
-`;
-
-const FaqAnswerContainer = styled.View`
-  flex-direction: row;
-  padding: 16px;
-  padding-top: 0;
-  background-color: #f9f9f9;
-`;
-
-const AnswerIcon = styled.View`
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
-  background-color: #ff571a;
-  justify-content: center;
-  align-items: center;
-  margin-right: 12px;
-`;
-
-const AnswerText = styled.Text`
-  font-size: 14px;
-  font-weight: 600;
-  color: #ffffff;
-`;
-
-const FaqAnswer = styled.Text`
-  flex: 1;
-  font-size: 14px;
-  color: #444444;
-  line-height: 20px;
-`;
-
-const MapCard = styled.View`
-  background-color: #ffffff;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid #f2f2f7;
-`;
-
-const MapPlaceholder = styled.View`
-  height: 180px;
-  background-color: #f5f5f7;
-  justify-content: center;
-  align-items: center;
-`;
-
-const MapPlaceholderText = styled.Text`
-  font-size: 14px;
-  color: #888888;
-  margin-top: 8px;
-`;
-
-const DirectionsContainer = styled.View`
-  padding: 16px;
-`;
-
-const DirectionItem = styled.View`
-  flex-direction: row;
-  align-items: flex-start;
-  margin-bottom: 12px;
-`;
-
-const DirectionIconContainer = styled.View`
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  justify-content: center;
-  align-items: center;
-  margin-right: 12px;
-`;
-
-const DirectionText = styled.View`
-  flex: 1;
-`;
-
-const DirectionTitle = styled.Text`
-  font-size: 15px;
-  font-weight: 600;
-  color: #222222;
-  margin-bottom: 4px;
-`;
-
-const DirectionDetail = styled.Text`
-  font-size: 14px;
-  color: #666666;
-  line-height: 20px;
-`;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.secondary50,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.white,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  section: {
+    padding: 24,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.white,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.text,
+    letterSpacing: -0.3,
+    marginBottom: 16,
+  },
+  infoCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    paddingVertical: 8,
+  },
+  infoItem: {
+    flexDirection: "row",
+    padding: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  infoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  infoContent: {
+    marginLeft: 16,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: COLORS.text,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: COLORS.gray100,
+    marginLeft: 72,
+  },
+  contactCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    paddingVertical: 8,
+  },
+  contactItem: {
+    flexDirection: "row",
+    padding: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  contactIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  contactInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  contactLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  contactText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: COLORS.text,
+  },
+  callButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary600,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noticeCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    padding: 16,
+    marginBottom: 12,
+  },
+  noticeCardImportant: {
+    backgroundColor: COLORS.warning50,
+    borderColor: COLORS.warning200,
+  },
+  noticeHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  noticeTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  noticeTitleImportant: {
+    color: COLORS.warning600,
+  },
+  noticeDate: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  noticeContent: {
+    fontSize: 14,
+    color: COLORS.textTertiary,
+    lineHeight: 20,
+  },
+  viewAllButton: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 12,
+    marginTop: 8,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.gray500,
+    marginRight: 4,
+  },
+  faqCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    marginBottom: 12,
+  },
+  faqQuestionRow: {
+    flexDirection: "row",
+    padding: 16,
+    alignItems: "center",
+  },
+  questionIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary600,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  questionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.white,
+  },
+  faqQuestion: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
+    color: COLORS.text,
+  },
+  faqAnswerContainer: {
+    flexDirection: "row",
+    padding: 16,
+    paddingTop: 0,
+    backgroundColor: COLORS.gray50,
+  },
+  answerIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.warning600,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  answerText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.white,
+  },
+  faqAnswer: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.gray600,
+    lineHeight: 20,
+  },
+  mapCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+  },
+  mapPlaceholder: {
+    height: 180,
+    backgroundColor: COLORS.gray100,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mapPlaceholderText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 8,
+  },
+  directionsContainer: {
+    padding: 16,
+  },
+  directionItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  directionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  directionText: {
+    flex: 1,
+  },
+  directionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  directionDetail: {
+    fontSize: 14,
+    color: COLORS.gray600,
+    lineHeight: 20,
+  },
+});

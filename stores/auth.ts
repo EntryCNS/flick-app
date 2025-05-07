@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
 import { AuthTokens, User } from "@/types/auth";
-import { api } from "@/lib/axios";
+import api from "@/libs/api";
+import { useNotificationStore } from "./notification";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -19,24 +20,33 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   isAuthenticated: false,
   user: null,
 
-  setTokens: async ({ accessToken, refreshToken }) => {
+  setTokens: async ({
+    accessToken,
+    refreshToken,
+  }: AuthTokens): Promise<void> => {
     await SecureStore.setItemAsync("access_token", accessToken);
     await SecureStore.setItemAsync("refresh_token", refreshToken);
     set({ isAuthenticated: true });
+
+    const { registerToken } = useNotificationStore.getState();
+    await registerToken();
   },
 
-  setUser: (user) => set({ user }),
+  setUser: (user: User): void => set({ user }),
 
-  fetchUserProfile: async () => {
+  fetchUserProfile: async (): Promise<void> => {
     try {
       const { data } = await api.get<User>("/users/me");
       set({ user: data });
     } catch (error) {
-      console.error("Failed to fetch user profile");
+      console.error("Failed to fetch user profile", error);
     }
   },
 
-  logout: async () => {
+  logout: async (): Promise<void> => {
+    const { unregisterToken } = useNotificationStore.getState();
+    await unregisterToken();
+
     await SecureStore.deleteItemAsync("access_token");
     await SecureStore.deleteItemAsync("refresh_token");
     set({ isAuthenticated: false, user: null });
@@ -53,8 +63,7 @@ export const loadTokens = async (): Promise<boolean> => {
       return true;
     }
   } catch (error) {
-    console.error("Failed to load tokens");
+    console.error("Failed to load tokens", error);
   }
-
   return false;
 };

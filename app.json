@@ -25,7 +25,8 @@
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.flick.app"
+      "package": "com.flick.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -40,10 +41,18 @@
         {
           "motionPermission": "Allow ${PRODUCT_NAME} to access your device motion"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1d4f3888-6474-4e13-b335-08b1eaacc1a9"
+      }
     }
   }
 }

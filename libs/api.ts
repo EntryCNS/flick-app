@@ -3,7 +3,7 @@ import { API_URL } from "@/constants/api";
 import * as SecureStore from "expo-secure-store";
 import { AxiosError } from "axios";
 
-export const api = axios.create({
+const api = axios.create({
   baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
@@ -60,3 +60,5 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export default api;

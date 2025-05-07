@@ -1,77 +1,102 @@
-import React, { useRef } from "react";
-import { ScrollView, StatusBar, Animated } from "react-native";
-import styled from "@emotion/native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ScrollView,
+  StatusBar,
+  Animated,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import api from "@/libs/api";
+import { COLORS } from "@/constants/colors";
 
-export default function HomeScreen() {
+interface Transaction {
+  id: number;
+  type: "CHARGE" | "PAYMENT";
+  amount: number;
+  booth: {
+    name: string;
+  };
+  product: {
+    name: string;
+  };
+  memo?: string;
+  createdAt: string;
+}
+
+export default function HomeScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [balance, setBalance] = useState<number>(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const balance = "32,000";
-  const transactions = [
-    {
-      id: "1",
-      title: "은관이의 꽃배달",
-      amount: "-4,000",
-      time: "12:45",
-      icon: "flower",
-      menu: "장미 한 송이",
-      iconBg: "#FFF3E8",
-      iconColor: "#FF571A",
-    },
-    {
-      id: "2",
-      title: "성준's 타로점",
-      amount: "-5,500",
-      time: "12:30",
-      icon: "sparkles",
-      menu: "연애운 타로 1회",
-      iconBg: "#F2F7F2",
-      iconColor: "#067A49",
-    },
-    {
-      id: "3",
-      title: "충전소",
-      amount: "+10,000",
-      time: "11:15",
-      icon: "card",
-      menu: "포인트 충전",
-      iconBg: "#EEF2FF",
-      iconColor: "#315DE7",
-    },
-    {
-      id: "4",
-      title: "가연's 페이스페인팅",
-      amount: "-3,500",
-      time: "11:05",
-      icon: "brush",
-      menu: "반짝이 페이스페인팅",
-      iconBg: "#F4F2FF",
-      iconColor: "#7F6BFF",
-    },
-    {
-      id: "5",
-      title: "충전소",
-      amount: "+30,000",
-      time: "10:23",
-      icon: "card",
-      menu: "포인트 충전",
-      iconBg: "#EEF2FF",
-      iconColor: "#315DE7",
-    },
-  ];
+  const generateIcon = (): keyof typeof Ionicons.glyphMap => {
+    const icons: (keyof typeof Ionicons.glyphMap)[] = [
+      "card-outline",
+      "bag-outline",
+      "person-outline",
+      "wallet-outline",
+      "cart-outline",
+    ];
+    return icons[Math.floor(Math.random() * icons.length)];
+  };
 
-  const formatAmount = (amount: string) => {
-    const numericPart = amount.replace(/[^0-9]/g, "");
-    const isPositive = amount.includes("+");
-    const formattedNum = parseInt(numericPart).toLocaleString("ko-KR");
-    return isPositive ? `+${formattedNum}` : `-${formattedNum}`;
+  const generateIconBackground = (type: string): string => {
+    let hash = 0;
+    for (let i = 0; i < type.length; i++) {
+      hash = type.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    const h = Math.abs(hash) % 360;
+    const s = 60 + (Math.abs(hash) % 20);
+    const l = 80 + (Math.abs(hash) % 10);
+
+    return `hsl(${h}, ${s}%, ${l}%)`;
+  };
+
+  const fetchBalance = async (): Promise<void> => {
+    try {
+      const { data } = await api.get("/users/me/balance");
+      setBalance(data);
+    } catch (error) {
+      console.error("Failed to fetch balance:", error);
+    }
+  };
+
+  const fetchTransactions = async (): Promise<void> => {
+    try {
+      const { data } = await api.get("/transactions/my");
+      setTransactions(data);
+    } catch (error) {
+      console.error("Failed to fetch transactions:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchBalance();
+    fetchTransactions();
+  }, []);
+
+  const formatAmount = (amount: number, type: string): string => {
+    const formattedNum = Math.abs(amount).toLocaleString("ko-KR");
+    return type === "CHARGE" ? `+${formattedNum}` : `-${formattedNum}`;
+  };
+
+  const formatTime = (dateTimeString: string): string => {
+    const date = new Date(dateTimeString);
+    return date.toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
   };
 
   return (
-    <Container style={{ paddingTop: insets.top }}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar
         barStyle="dark-content"
         backgroundColor="transparent"
@@ -88,21 +113,25 @@ export default function HomeScreen() {
           zIndex: 10,
           shadowOffset: { width: 0, height: 2 },
           shadowRadius: 8,
-          shadowColor: "#000000",
-          backgroundColor: "white",
+          shadowColor: COLORS.black,
+          backgroundColor: COLORS.white,
         }}
       >
-        <Header>
-          <LogoContainer>
-            <BrandName>
-              <ColoredText>F</ColoredText>lick
-            </BrandName>
-          </LogoContainer>
-          <IconButton>
-            <Ionicons name="notifications-outline" size={22} color="#222222" />
-            <NotificationDot />
-          </IconButton>
-        </Header>
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Text style={styles.brandName}>
+              <Text style={styles.coloredText}>F</Text>lick
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons
+              name="notifications-outline"
+              size={22}
+              color={COLORS.text}
+            />
+            <View style={styles.notificationDot} />
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       <ScrollView
@@ -114,310 +143,337 @@ export default function HomeScreen() {
         )}
         scrollEventThrottle={16}
       >
-        <BalanceSection>
-          <BalanceLabel>남은 포인트</BalanceLabel>
-          <AmountText>
+        <View style={styles.balanceSection}>
+          <Text style={styles.balanceLabel}>남은 포인트</Text>
+          <Text style={styles.amountText}>
             {balance}
-            <Won>P</Won>
-          </AmountText>
+            <Text style={styles.won}>P</Text>
+          </Text>
 
-          <QuickAccessRow>
-            <QuickButton
-              style={{ backgroundColor: "#EEF2FF" }}
+          <View style={styles.quickAccessRow}>
+            <TouchableOpacity
+              style={[
+                styles.quickButton,
+                { backgroundColor: COLORS.primary50 },
+              ]}
               onPress={() => router.push("/qr-scanner")}
             >
-              <QuickButtonIcon color="#315DE7">
-                <Ionicons name="qr-code" size={18} color="#315DE7" />
-              </QuickButtonIcon>
-              <QuickButtonText>QR결제</QuickButtonText>
-            </QuickButton>
+              <View
+                style={[
+                  styles.quickButtonIcon,
+                  { borderColor: COLORS.primary600 + "20" },
+                ]}
+              >
+                <Ionicons name="qr-code" size={18} color={COLORS.primary600} />
+              </View>
+              <Text style={styles.quickButtonText}>QR결제</Text>
+            </TouchableOpacity>
 
-            <QuickButton
-              style={{ backgroundColor: "#F2F7F2" }}
+            <TouchableOpacity
+              style={[
+                styles.quickButton,
+                { backgroundColor: COLORS.success50 },
+              ]}
               onPress={() => router.push("/charge-point")}
             >
-              <QuickButtonIcon color="#067A49">
-                <Ionicons name="card" size={18} color="#067A49" />
-              </QuickButtonIcon>
-              <QuickButtonText>충전</QuickButtonText>
-            </QuickButton>
+              <View
+                style={[
+                  styles.quickButtonIcon,
+                  { borderColor: COLORS.success600 + "20" },
+                ]}
+              >
+                <Ionicons name="card" size={18} color={COLORS.success600} />
+              </View>
+              <Text style={styles.quickButtonText}>충전</Text>
+            </TouchableOpacity>
 
-            <QuickButton
-              style={{ backgroundColor: "#FFF3E8" }}
+            <TouchableOpacity
+              style={[
+                styles.quickButton,
+                { backgroundColor: COLORS.warning50 },
+              ]}
               onPress={() => router.push("/booth-map")}
             >
-              <QuickButtonIcon color="#FF571A">
-                <Ionicons name="map" size={18} color="#FF571A" />
-              </QuickButtonIcon>
-              <QuickButtonText>부스맵</QuickButtonText>
-            </QuickButton>
+              <View
+                style={[
+                  styles.quickButtonIcon,
+                  { borderColor: COLORS.warning600 + "20" },
+                ]}
+              >
+                <Ionicons name="map" size={18} color={COLORS.warning600} />
+              </View>
+              <Text style={styles.quickButtonText}>부스맵</Text>
+            </TouchableOpacity>
 
-            <QuickButton
-              style={{ backgroundColor: "#F4F2FF" }}
+            <TouchableOpacity
+              style={[styles.quickButton, { backgroundColor: COLORS.info50 }]}
               onPress={() => router.push("/info-guide")}
             >
-              <QuickButtonIcon color="#7F6BFF">
-                <Ionicons name="information-circle" size={18} color="#7F6BFF" />
-              </QuickButtonIcon>
-              <QuickButtonText>안내</QuickButtonText>
-            </QuickButton>
-          </QuickAccessRow>
-        </BalanceSection>
+              <View
+                style={[
+                  styles.quickButtonIcon,
+                  { borderColor: COLORS.info600 + "20" },
+                ]}
+              >
+                <Ionicons
+                  name="information-circle"
+                  size={18}
+                  color={COLORS.info600}
+                />
+              </View>
+              <Text style={styles.quickButtonText}>안내</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <TransactionSection>
-          <SectionHeaderRow>
-            <SectionTitle>결제 내역</SectionTitle>
-          </SectionHeaderRow>
+        <View style={styles.transactionSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>결제 내역</Text>
+          </View>
 
-          <TransactionsCard>
+          <View style={styles.transactionsCard}>
             {transactions.map((transaction, index) => (
               <React.Fragment key={transaction.id}>
-                <TransactionItem>
-                  <TransactionIcon
-                    style={{ backgroundColor: transaction.iconBg }}
+                <TouchableOpacity style={styles.transactionItem}>
+                  <View
+                    style={[
+                      styles.transactionIcon,
+                      {
+                        backgroundColor: generateIconBackground(
+                          transaction.type
+                        ),
+                      },
+                    ]}
                   >
                     <Ionicons
-                      name={transaction.icon as any}
+                      name={generateIcon()}
                       size={18}
-                      color={transaction.iconColor}
+                      color={COLORS.white}
                     />
-                  </TransactionIcon>
+                  </View>
 
-                  <TransactionContent>
-                    <TransactionTitle>{transaction.title}</TransactionTitle>
-                    <TransactionMenu>{transaction.menu}</TransactionMenu>
-                  </TransactionContent>
+                  <View style={styles.transactionContent}>
+                    <Text style={styles.transactionTitle}>
+                      {transaction.type === "PAYMENT"
+                        ? transaction.product.name
+                        : "충전"}
+                    </Text>
+                    <Text style={styles.transactionMenu}>
+                      {transaction.type === "PAYMENT"
+                        ? transaction.booth.name
+                        : transaction.memo || ""}
+                    </Text>
+                  </View>
 
-                  <AmountView>
-                    <TransactionAmount
-                      isPositive={transaction.amount.includes("+")}
+                  <View style={styles.amountView}>
+                    <Text
+                      style={[
+                        styles.transactionAmount,
+                        transaction.type === "CHARGE" &&
+                          styles.transactionAmountPositive,
+                      ]}
                     >
-                      {formatAmount(transaction.amount)}P
-                    </TransactionAmount>
-                    <TransactionTime>{transaction.time}</TransactionTime>
-                  </AmountView>
-                </TransactionItem>
+                      {formatAmount(transaction.amount, transaction.type)}P
+                    </Text>
+                    <Text style={styles.transactionTime}>
+                      {formatTime(transaction.createdAt)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
 
-                {index < transactions.length - 1 && <Separator />}
+                {index < transactions.length - 1 && (
+                  <View style={styles.separator} />
+                )}
               </React.Fragment>
             ))}
 
-            <ShowMoreButton>
-              <ShowMoreText>내역 더보기</ShowMoreText>
-              <Ionicons name="chevron-down" size={14} color="#666666" />
-            </ShowMoreButton>
-          </TransactionsCard>
-        </TransactionSection>
+            <TouchableOpacity style={styles.showMoreButton}>
+              <Text style={styles.showMoreText}>내역 더보기</Text>
+              <Ionicons name="chevron-down" size={14} color={COLORS.gray600} />
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
-    </Container>
+    </View>
   );
 }
 
-const Container = styled.View`
-  flex: 1;
-  background-color: #fcfcfc;
-`;
-
-const Header = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  background-color: #ffffff;
-`;
-
-const LogoContainer = styled.View`
-  flex-direction: row;
-  align-items: center;
-`;
-
-const BrandName = styled.Text`
-  font-size: 24px;
-  font-weight: 700;
-  color: #222222;
-  letter-spacing: -0.4px;
-`;
-
-const ColoredText = styled.Text`
-  color: #315de7;
-`;
-
-const IconButton = styled.TouchableOpacity`
-  width: 38px;
-  height: 38px;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-`;
-
-const NotificationDot = styled.View`
-  width: 6px;
-  height: 6px;
-  border-radius: 3px;
-  background-color: #ff3b30;
-  position: absolute;
-  top: 9px;
-  right: 9px;
-`;
-
-const BalanceSection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-`;
-
-const BalanceLabel = styled.Text`
-  font-size: 15px;
-  font-weight: 600;
-  color: #222222;
-  letter-spacing: -0.3px;
-  margin-bottom: 8px;
-`;
-
-const AmountText = styled.Text`
-  font-size: 34px;
-  font-weight: 700;
-  color: #222222;
-  letter-spacing: -0.7px;
-  margin-bottom: 24px;
-`;
-
-const Won = styled.Text`
-  font-size: 22px;
-  font-weight: 600;
-  margin-left: 2px;
-`;
-
-const QuickAccessRow = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-`;
-
-const QuickButton = styled.TouchableOpacity`
-  align-items: center;
-  padding: 10px;
-  border-radius: 10px;
-  width: 22%;
-`;
-
-interface IconProps {
-  color: string;
-}
-
-const QuickButtonIcon = styled.View<IconProps>`
-  width: 36px;
-  height: 36px;
-  border-radius: 18px;
-  background-color: white;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 6px;
-  border-width: 1px;
-  border-color: ${(props) => props.color + "20"};
-`;
-
-const QuickButtonText = styled.Text`
-  font-size: 12px;
-  font-weight: 500;
-  color: #333333;
-`;
-
-const TransactionSection = styled.View`
-  padding: 0 20px;
-  margin-bottom: 16px;
-`;
-
-const SectionHeaderRow = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-`;
-
-const SectionTitle = styled.Text`
-  font-size: 18px;
-  font-weight: 700;
-  color: #222222;
-  letter-spacing: -0.3px;
-`;
-
-const TransactionsCard = styled.View`
-  background-color: #ffffff;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid #f2f2f7;
-`;
-
-const TransactionItem = styled.TouchableOpacity`
-  flex-direction: row;
-  padding: 18px;
-  align-items: center;
-`;
-
-const TransactionIcon = styled.View`
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  justify-content: center;
-  align-items: center;
-`;
-
-const TransactionContent = styled.View`
-  flex: 1;
-  margin-left: 16px;
-`;
-
-const TransactionTitle = styled.Text`
-  font-size: 16px;
-  font-weight: 500;
-  color: #222222;
-  letter-spacing: -0.2px;
-  margin-bottom: 4px;
-`;
-
-const TransactionMenu = styled.Text`
-  font-size: 13px;
-  color: #888888;
-`;
-
-const AmountView = styled.View`
-  align-items: flex-end;
-`;
-
-interface AmountProps {
-  isPositive: boolean;
-}
-
-const TransactionAmount = styled.Text<AmountProps>`
-  font-size: 16px;
-  font-weight: 600;
-  color: ${(props) => (props.isPositive ? "#315DE7" : "#222222")};
-  letter-spacing: -0.2px;
-  margin-bottom: 4px;
-`;
-
-const TransactionTime = styled.Text`
-  font-size: 12px;
-  color: #888888;
-`;
-
-const Separator = styled.View`
-  height: 1px;
-  background-color: #f5f5f5;
-  margin-left: 76px;
-`;
-
-const ShowMoreButton = styled.TouchableOpacity`
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  padding: 16px;
-  background-color: #fafafa;
-`;
-
-const ShowMoreText = styled.Text`
-  font-size: 14px;
-  font-weight: 500;
-  color: #666666;
-  margin-right: 4px;
-`;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.secondary50,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.white,
+  },
+  logoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  brandName: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: COLORS.text,
+    letterSpacing: -0.4,
+  },
+  coloredText: {
+    color: COLORS.primary600,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  notificationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.danger500,
+    position: "absolute",
+    top: 9,
+    right: 9,
+  },
+  balanceSection: {
+    padding: 24,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.white,
+    marginBottom: 12,
+  },
+  balanceLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.text,
+    letterSpacing: -0.3,
+    marginBottom: 8,
+  },
+  amountText: {
+    fontSize: 34,
+    fontWeight: "700",
+    color: COLORS.text,
+    letterSpacing: -0.7,
+    marginBottom: 24,
+  },
+  won: {
+    fontSize: 22,
+    fontWeight: "600",
+    marginLeft: 2,
+  },
+  quickAccessRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  quickButton: {
+    alignItems: "center",
+    padding: 10,
+    borderRadius: 10,
+    width: "22%",
+  },
+  quickButtonIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.white,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 6,
+    borderWidth: 1,
+  },
+  quickButtonText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: COLORS.text,
+  },
+  transactionSection: {
+    padding: 0,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.text,
+    letterSpacing: -0.3,
+  },
+  transactionsCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+  },
+  transactionItem: {
+    flexDirection: "row",
+    padding: 18,
+    alignItems: "center",
+  },
+  transactionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  transactionContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  transactionTitle: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: COLORS.text,
+    letterSpacing: -0.2,
+    marginBottom: 4,
+  },
+  transactionMenu: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  amountView: {
+    alignItems: "flex-end",
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+    letterSpacing: -0.2,
+    marginBottom: 4,
+  },
+  transactionAmountPositive: {
+    color: COLORS.primary600,
+  },
+  transactionTime: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: COLORS.gray100,
+    marginLeft: 76,
+  },
+  showMoreButton: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: COLORS.gray50,
+  },
+  showMoreText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.gray600,
+    marginRight: 4,
+  },
+});

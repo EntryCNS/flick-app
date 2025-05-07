@@ -1,45 +1,45 @@
+import React from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Link, Stack } from "expo-router";
-import styled from "@emotion/native";
-import { useTheme } from "@emotion/react";
+import { COLORS } from "@/constants/colors";
 
-export default function NotFoundScreen() {
-  const theme = useTheme();
-
+export default function NotFoundScreen(): React.ReactElement {
   return (
     <>
       <Stack.Screen options={{ title: "찾을 수 없음" }} />
-      <Container>
-        <Title>페이지를 찾을 수 없습니다.</Title>
-        <StyledLink href="/">
-          <LinkText>홈으로 돌아가기</LinkText>
-        </StyledLink>
-      </Container>
+      <View style={styles.container}>
+        <Text style={styles.title}>페이지를 찾을 수 없습니다.</Text>
+        <Link href="/" asChild>
+          <Pressable style={styles.link}>
+            <Text style={styles.linkText}>홈으로 돌아가기</Text>
+          </Pressable>
+        </Link>
+      </View>
     </>
   );
 }
 
-const Container = styled.View`
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background-color: ${(props) => props.theme.colors.background.default};
-`;
-
-const Title = styled.Text`
-  font-size: 20px;
-  font-family: PretendardBold;
-  color: ${(props) => props.theme.colors.text.primary};
-`;
-
-const StyledLink = styled(Link)`
-  margin-top: 15px;
-  padding-top: 15px;
-  padding-bottom: 15px;
-`;
-
-const LinkText = styled.Text`
-  font-size: 14px;
-  font-family: Pretendard;
-  color: ${(props) => props.theme.colors.primary[500]};
-`;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: COLORS.white,
+  },
+  title: {
+    fontSize: 20,
+    fontFamily: "PretendardBold",
+    color: COLORS.text,
+  },
+  link: {
+    marginTop: 15,
+    paddingTop: 15,
+    paddingBottom: 15,
+  },
+  linkText: {
+    fontSize: 14,
+    fontFamily: "Pretendard",
+    color: COLORS.primary600,
+  },
+});

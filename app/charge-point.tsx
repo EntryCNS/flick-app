@@ -6,18 +6,40 @@ import {
   TouchableOpacity,
   View,
   Alert,
+  Text,
+  StyleSheet,
 } from "react-native";
-import styled from "@emotion/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { COLORS } from "@/constants/colors";
 
-export default function ChargePointScreen() {
+interface ChargeLocation {
+  id: string;
+  name: string;
+  location: string;
+  hours: string;
+  status: string;
+  distance: string;
+  isPopular: boolean;
+}
+
+interface ChargeHistoryItem {
+  id: string;
+  amount: string;
+  time: string;
+  location: string;
+  method: string;
+}
+
+export default function ChargePointScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
-  const [selectedTab, setSelectedTab] = useState("locations");
+  const [selectedTab, setSelectedTab] = useState<"locations" | "history">(
+    "locations"
+  );
 
-  const chargeLocations = [
+  const chargeLocations: ChargeLocation[] = [
     {
       id: "1",
       name: "메인 충전소",
@@ -47,7 +69,7 @@ export default function ChargePointScreen() {
     },
   ];
 
-  const chargeHistory = [
+  const chargeHistory: ChargeHistoryItem[] = [
     {
       id: "1",
       amount: "+30,000",
@@ -78,7 +100,7 @@ export default function ChargePointScreen() {
     },
   ];
 
-  const handleChargeRequest = () => {
+  const handleChargeRequest = (): void => {
     Alert.alert(
       "충전 안내",
       "포인트 충전은 행사장 내 충전소에서만 가능합니다. 가까운 충전소를 방문해주세요.",
@@ -87,7 +109,7 @@ export default function ChargePointScreen() {
   };
 
   return (
-    <Container style={{ paddingTop: insets.top }}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar
         barStyle="dark-content"
         backgroundColor="transparent"
@@ -104,19 +126,26 @@ export default function ChargePointScreen() {
           zIndex: 10,
           shadowOffset: { width: 0, height: 2 },
           shadowRadius: 8,
-          shadowColor: "#000000",
-          backgroundColor: "white",
+          shadowColor: COLORS.black,
+          backgroundColor: COLORS.white,
         }}
       >
-        <Header>
-          <BackButton onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#222222" />
-          </BackButton>
-          <HeaderTitle>포인트 충전</HeaderTitle>
-          <IconButton>
-            <Ionicons name="help-circle-outline" size={22} color="#222222" />
-          </IconButton>
-        </Header>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>포인트 충전</Text>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons
+              name="help-circle-outline"
+              size={22}
+              color={COLORS.text}
+            />
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       <ScrollView
@@ -128,556 +157,608 @@ export default function ChargePointScreen() {
         )}
         scrollEventThrottle={16}
       >
-        <BalanceSection>
-          <BalanceLabel>현재 포인트</BalanceLabel>
-          <AmountText>
+        <View style={styles.balanceSection}>
+          <Text style={styles.balanceLabel}>현재 포인트</Text>
+          <Text style={styles.amountText}>
             32,000
-            <Won>P</Won>
-          </AmountText>
+            <Text style={styles.won}>P</Text>
+          </Text>
 
-          <ChargeButton onPress={handleChargeRequest}>
-            <ChargeButtonText>충전소에서 충전하기</ChargeButtonText>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-          </ChargeButton>
+          <TouchableOpacity
+            style={styles.chargeButton}
+            onPress={handleChargeRequest}
+          >
+            <Text style={styles.chargeButtonText}>충전소에서 충전하기</Text>
+            <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
+          </TouchableOpacity>
 
-          <GuideText>
+          <Text style={styles.guideText}>
             * 포인트 충전은 행사장 내 충전소에서만 가능합니다
-          </GuideText>
-        </BalanceSection>
+          </Text>
+        </View>
 
-        <TabSection>
-          <TabButton
-            active={selectedTab === "locations"}
+        <View style={styles.tabSection}>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              selectedTab === "locations" && styles.tabButtonActive,
+            ]}
             onPress={() => setSelectedTab("locations")}
           >
-            <TabText active={selectedTab === "locations"}>충전소 위치</TabText>
-          </TabButton>
-          <TabButton
-            active={selectedTab === "history"}
+            <Text
+              style={[
+                styles.tabText,
+                selectedTab === "locations" && styles.tabTextActive,
+              ]}
+            >
+              충전소 위치
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              selectedTab === "history" && styles.tabButtonActive,
+            ]}
             onPress={() => setSelectedTab("history")}
           >
-            <TabText active={selectedTab === "history"}>충전 내역</TabText>
-          </TabButton>
-        </TabSection>
+            <Text
+              style={[
+                styles.tabText,
+                selectedTab === "history" && styles.tabTextActive,
+              ]}
+            >
+              충전 내역
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {selectedTab === "locations" ? (
-          <LocationsSection>
-            <SectionHeaderRow>
-              <SectionTitle>충전소 위치</SectionTitle>
-              <ViewMapButton>
-                <ViewMapText>지도 보기</ViewMapText>
-                <Ionicons name="map-outline" size={14} color="#315DE7" />
-              </ViewMapButton>
-            </SectionHeaderRow>
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>충전소 위치</Text>
+              <TouchableOpacity style={styles.viewMapButton}>
+                <Text style={styles.viewMapText}>지도 보기</Text>
+                <Ionicons
+                  name="map-outline"
+                  size={14}
+                  color={COLORS.primary600}
+                />
+              </TouchableOpacity>
+            </View>
 
             {chargeLocations.map((location) => (
-              <LocationCard key={location.id}>
-                <LocationIconContainer>
-                  <Ionicons name="card" size={24} color="#315DE7" />
-                </LocationIconContainer>
+              <TouchableOpacity key={location.id} style={styles.locationCard}>
+                <View style={styles.locationIconContainer}>
+                  <Ionicons name="card" size={24} color={COLORS.primary600} />
+                </View>
 
-                <LocationContent>
-                  <LocationHeader>
-                    <LocationName>{location.name}</LocationName>
-                    {location.isPopular && <PopularTag>인기</PopularTag>}
-                  </LocationHeader>
-                  <LocationAddress>
-                    <Ionicons name="location" size={14} color="#888888" />
-                    <LocationText>{location.location}</LocationText>
-                  </LocationAddress>
-                  <LocationHours>
-                    <Ionicons name="time-outline" size={14} color="#888888" />
-                    <LocationText>{location.hours}</LocationText>
-                  </LocationHours>
-                </LocationContent>
+                <View style={styles.locationContent}>
+                  <View style={styles.locationHeader}>
+                    <Text style={styles.locationName}>{location.name}</Text>
+                    {location.isPopular && (
+                      <Text style={styles.popularTag}>인기</Text>
+                    )}
+                  </View>
+                  <View style={styles.locationAddress}>
+                    <Ionicons
+                      name="location"
+                      size={14}
+                      color={COLORS.textSecondary}
+                    />
+                    <Text style={styles.locationText}>{location.location}</Text>
+                  </View>
+                  <View style={styles.locationHours}>
+                    <Ionicons
+                      name="time-outline"
+                      size={14}
+                      color={COLORS.textSecondary}
+                    />
+                    <Text style={styles.locationText}>{location.hours}</Text>
+                  </View>
+                </View>
 
-                <LocationRightContent>
-                  <StatusContainer status={location.status === "운영중"}>
-                    <StatusText status={location.status}>
+                <View style={styles.locationRightContent}>
+                  <View
+                    style={[
+                      styles.statusContainer,
+                      location.status === "운영중"
+                        ? styles.statusContainerOpen
+                        : styles.statusContainerClosed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        location.status === "운영중"
+                          ? styles.statusTextOpen
+                          : styles.statusTextClosed,
+                      ]}
+                    >
                       {location.status}
-                    </StatusText>
-                  </StatusContainer>
-                  <DistanceText>{location.distance}</DistanceText>
-                  <NavigateButton>
-                    <Ionicons name="navigate" size={18} color="#315DE7" />
-                  </NavigateButton>
-                </LocationRightContent>
-              </LocationCard>
+                    </Text>
+                  </View>
+                  <Text style={styles.distanceText}>{location.distance}</Text>
+                  <TouchableOpacity style={styles.navigateButton}>
+                    <Ionicons
+                      name="navigate"
+                      size={18}
+                      color={COLORS.primary600}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
             ))}
 
-            <PaymentMethodSection>
-              <MethodTitle>결제 수단</MethodTitle>
-              <MethodRow>
-                <MethodItem>
-                  <MethodIcon style={{ backgroundColor: "#EEF2FF" }}>
-                    <Ionicons name="cash-outline" size={18} color="#315DE7" />
-                  </MethodIcon>
-                  <MethodLabel>현금</MethodLabel>
-                </MethodItem>
-                <MethodItem>
-                  <MethodIcon style={{ backgroundColor: "#F2F7F2" }}>
-                    <Ionicons name="card-outline" size={18} color="#067A49" />
-                  </MethodIcon>
-                  <MethodLabel>카드</MethodLabel>
-                </MethodItem>
-                <MethodItem>
-                  <MethodIcon style={{ backgroundColor: "#FFF3E8" }}>
+            <View style={styles.paymentMethodSection}>
+              <Text style={styles.methodTitle}>결제 수단</Text>
+              <View style={styles.methodRow}>
+                <View style={styles.methodItem}>
+                  <View
+                    style={[
+                      styles.methodIcon,
+                      { backgroundColor: COLORS.primary50 },
+                    ]}
+                  >
+                    <Ionicons
+                      name="cash-outline"
+                      size={18}
+                      color={COLORS.primary600}
+                    />
+                  </View>
+                  <Text style={styles.methodLabel}>현금</Text>
+                </View>
+                <View style={styles.methodItem}>
+                  <View
+                    style={[
+                      styles.methodIcon,
+                      { backgroundColor: COLORS.success50 },
+                    ]}
+                  >
+                    <Ionicons
+                      name="card-outline"
+                      size={18}
+                      color={COLORS.success600}
+                    />
+                  </View>
+                  <Text style={styles.methodLabel}>카드</Text>
+                </View>
+                <View style={styles.methodItem}>
+                  <View
+                    style={[
+                      styles.methodIcon,
+                      { backgroundColor: COLORS.warning50 },
+                    ]}
+                  >
                     <Ionicons
                       name="phone-portrait-outline"
                       size={18}
-                      color="#FF571A"
+                      color={COLORS.warning600}
                     />
-                  </MethodIcon>
-                  <MethodLabel>계좌이체</MethodLabel>
-                </MethodItem>
-              </MethodRow>
-            </PaymentMethodSection>
-          </LocationsSection>
+                  </View>
+                  <Text style={styles.methodLabel}>계좌이체</Text>
+                </View>
+              </View>
+            </View>
+          </View>
         ) : (
-          <HistorySection>
-            <SectionHeaderRow>
-              <SectionTitle>충전 내역</SectionTitle>
-            </SectionHeaderRow>
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>충전 내역</Text>
+            </View>
 
-            <HistoryCard>
+            <View style={styles.historyCard}>
               {chargeHistory.map((history, index) => (
                 <React.Fragment key={history.id}>
-                  <HistoryItem>
-                    <HistoryIconContainer>
-                      <Ionicons name="card" size={20} color="#315DE7" />
-                    </HistoryIconContainer>
+                  <View style={styles.historyItem}>
+                    <View style={styles.historyIconContainer}>
+                      <Ionicons
+                        name="card"
+                        size={20}
+                        color={COLORS.primary600}
+                      />
+                    </View>
 
-                    <HistoryContent>
-                      <HistoryAmount>{history.amount}P</HistoryAmount>
-                      <HistoryDetails>
-                        <HistoryLocation>{history.location}</HistoryLocation>
-                        <MethodPill>
-                          <MethodPillText>{history.method}</MethodPillText>
-                        </MethodPill>
-                      </HistoryDetails>
-                      <HistoryTime>{history.time}</HistoryTime>
-                    </HistoryContent>
-                  </HistoryItem>
+                    <View style={styles.historyContent}>
+                      <Text style={styles.historyAmount}>
+                        {history.amount}P
+                      </Text>
+                      <View style={styles.historyDetails}>
+                        <Text style={styles.historyLocation}>
+                          {history.location}
+                        </Text>
+                        <View style={styles.methodPill}>
+                          <Text style={styles.methodPillText}>
+                            {history.method}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.historyTime}>{history.time}</Text>
+                    </View>
+                  </View>
 
-                  {index < chargeHistory.length - 1 && <Separator />}
+                  {index < chargeHistory.length - 1 && (
+                    <View style={styles.separator} />
+                  )}
                 </React.Fragment>
               ))}
-            </HistoryCard>
-          </HistorySection>
+            </View>
+          </View>
         )}
 
-        <InfoSection>
-          <InfoTitle>충전 안내</InfoTitle>
-          <InfoItem>
-            <InfoBullet />
-            <InfoText>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>충전 안내</Text>
+          <View style={styles.infoItem}>
+            <View style={styles.infoBullet} />
+            <Text style={styles.infoText}>
               포인트는 행사장 내 충전소에서만 충전 가능합니다.
-            </InfoText>
-          </InfoItem>
-          <InfoItem>
-            <InfoBullet />
-            <InfoText>
+            </Text>
+          </View>
+          <View style={styles.infoItem}>
+            <View style={styles.infoBullet} />
+            <Text style={styles.infoText}>
               충전 가능 금액: 5,000P, 10,000P, 30,000P, 50,000P
-            </InfoText>
-          </InfoItem>
-          <InfoItem>
-            <InfoBullet />
-            <InfoText>
+            </Text>
+          </View>
+          <View style={styles.infoItem}>
+            <View style={styles.infoBullet} />
+            <Text style={styles.infoText}>
               미사용 포인트는 행사 종료 후 환불 가능합니다. (환불 장소: 메인
               충전소)
-            </InfoText>
-          </InfoItem>
-          <InfoItem>
-            <InfoBullet />
-            <InfoText>환불 기간: 행사 종료일로부터 7일 이내</InfoText>
-          </InfoItem>
-        </InfoSection>
+            </Text>
+          </View>
+          <View style={styles.infoItem}>
+            <View style={styles.infoBullet} />
+            <Text style={styles.infoText}>
+              환불 기간: 행사 종료일로부터 7일 이내
+            </Text>
+          </View>
+        </View>
       </ScrollView>
-    </Container>
+    </View>
   );
 }
 
-const Container = styled.View`
-  flex: 1;
-  background-color: #fcfcfc;
-`;
-
-const Header = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  background-color: #ffffff;
-`;
-
-const BackButton = styled.TouchableOpacity`
-  width: 38px;
-  height: 38px;
-  justify-content: center;
-  align-items: center;
-`;
-
-const HeaderTitle = styled.Text`
-  font-size: 18px;
-  font-weight: 600;
-  color: #222222;
-`;
-
-const IconButton = styled.TouchableOpacity`
-  width: 38px;
-  height: 38px;
-  justify-content: center;
-  align-items: center;
-`;
-
-const BalanceSection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-  align-items: center;
-`;
-
-const BalanceLabel = styled.Text`
-  font-size: 15px;
-  font-weight: 600;
-  color: #222222;
-  letter-spacing: -0.3px;
-  margin-bottom: 8px;
-`;
-
-const AmountText = styled.Text`
-  font-size: 34px;
-  font-weight: 700;
-  color: #222222;
-  letter-spacing: -0.7px;
-  margin-bottom: 24px;
-`;
-
-const Won = styled.Text`
-  font-size: 22px;
-  font-weight: 600;
-  margin-left: 2px;
-`;
-
-const ChargeButton = styled.TouchableOpacity`
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  background-color: #315de7;
-  border-radius: 10px;
-  padding: 14px 20px;
-  width: 80%;
-  margin-bottom: 16px;
-`;
-
-const ChargeButtonText = styled.Text`
-  font-size: 16px;
-  font-weight: 600;
-  color: #ffffff;
-  margin-right: 8px;
-`;
-
-const GuideText = styled.Text`
-  font-size: 13px;
-  color: #888888;
-  text-align: center;
-`;
-
-const TabSection = styled.View`
-  flex-direction: row;
-  background-color: #ffffff;
-  border-bottom-width: 1px;
-  border-bottom-color: #f2f2f7;
-`;
-
-interface TabProps {
-  active: boolean;
-}
-
-const TabButton = styled.TouchableOpacity<TabProps>`
-  flex: 1;
-  padding: 14px 0;
-  align-items: center;
-  border-bottom-width: 2px;
-  border-bottom-color: ${(props) => (props.active ? "#315DE7" : "transparent")};
-`;
-
-const TabText = styled.Text<TabProps>`
-  font-size: 15px;
-  font-weight: ${(props) => (props.active ? "600" : "400")};
-  color: ${(props) => (props.active ? "#315DE7" : "#666666")};
-`;
-
-const LocationsSection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-`;
-
-const HistorySection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-`;
-
-const SectionHeaderRow = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-`;
-
-const SectionTitle = styled.Text`
-  font-size: 18px;
-  font-weight: 700;
-  color: #222222;
-  letter-spacing: -0.3px;
-`;
-
-const ViewMapButton = styled.TouchableOpacity`
-  flex-direction: row;
-  align-items: center;
-`;
-
-const ViewMapText = styled.Text`
-  font-size: 14px;
-  font-weight: 500;
-  color: #315de7;
-  margin-right: 4px;
-`;
-
-const LocationCard = styled.TouchableOpacity`
-  flex-direction: row;
-  background-color: #ffffff;
-  border-radius: 14px;
-  padding: 16px;
-  margin-bottom: 12px;
-  border-width: 1px;
-  border-color: #f2f2f7;
-`;
-
-const LocationIconContainer = styled.View`
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background-color: #eef2ff;
-  justify-content: center;
-  align-items: center;
-`;
-
-const LocationContent = styled.View`
-  flex: 1;
-  margin-left: 16px;
-`;
-
-const LocationHeader = styled.View`
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 6px;
-`;
-
-const LocationName = styled.Text`
-  font-size: 16px;
-  font-weight: 600;
-  color: #222222;
-  margin-right: 8px;
-`;
-
-const PopularTag = styled.Text`
-  font-size: 10px;
-  font-weight: 500;
-  color: #ff571a;
-  background-color: #fff3e8;
-  padding: 2px 6px;
-  border-radius: 4px;
-`;
-
-const LocationAddress = styled.View`
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 4px;
-`;
-
-const LocationText = styled.Text`
-  font-size: 13px;
-  color: #888888;
-  margin-left: 4px;
-`;
-
-const LocationHours = styled.View`
-  flex-direction: row;
-  align-items: center;
-`;
-
-const LocationRightContent = styled.View`
-  align-items: flex-end;
-  justify-content: space-between;
-`;
-
-interface StatusProps {
-  status: boolean;
-}
-
-const StatusContainer = styled.View<StatusProps>`
-  padding: 4px 8px;
-  border-radius: 4px;
-  background-color: ${(props) => (props.status ? "#F2F7F2" : "#FFF3E8")};
-`;
-
-const StatusText = styled.Text<{ status: string }>`
-  font-size: 12px;
-  font-weight: 500;
-  color: ${(props) => (props.status ? "#067A49" : "#FF571A")};
-`;
-
-const DistanceText = styled.Text`
-  font-size: 13px;
-  color: #888888;
-  margin: 4px 0;
-`;
-
-const NavigateButton = styled.TouchableOpacity`
-  width: 36px;
-  height: 36px;
-  border-radius: 18px;
-  background-color: #eef2ff;
-  justify-content: center;
-  align-items: center;
-`;
-
-const PaymentMethodSection = styled.View`
-  margin-top: 24px;
-`;
-
-const MethodTitle = styled.Text`
-  font-size: 16px;
-  font-weight: 600;
-  color: #222222;
-  margin-bottom: 16px;
-`;
-
-const MethodRow = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-`;
-
-const MethodItem = styled.View`
-  align-items: center;
-  width: 30%;
-`;
-
-const MethodIcon = styled.View`
-  width: 48px;
-  height: 48px;
-  border-radius: 24px;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 8px;
-`;
-
-const MethodLabel = styled.Text`
-  font-size: 14px;
-  color: #444444;
-`;
-
-const HistoryCard = styled.View`
-  background-color: #ffffff;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid #f2f2f7;
-`;
-
-const HistoryItem = styled.View`
-  flex-direction: row;
-  padding: 16px;
-  align-items: center;
-`;
-
-const HistoryIconContainer = styled.View`
-  width: 40px;
-  height: 40px;
-  border-radius: 20px;
-  background-color: #eef2ff;
-  justify-content: center;
-  align-items: center;
-  margin-right: 14px;
-`;
-
-const HistoryContent = styled.View`
-  flex: 1;
-`;
-
-const HistoryAmount = styled.Text`
-  font-size: 16px;
-  font-weight: 600;
-  color: #315de7;
-  margin-bottom: 4px;
-`;
-
-const HistoryDetails = styled.View`
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 4px;
-`;
-
-const HistoryLocation = styled.Text`
-  font-size: 14px;
-  color: #444444;
-  margin-right: 8px;
-`;
-
-const MethodPill = styled.View`
-  background-color: #f5f5f7;
-  padding: 2px 6px;
-  border-radius: 4px;
-`;
-
-const MethodPillText = styled.Text`
-  font-size: 11px;
-  color: #666666;
-`;
-
-const HistoryTime = styled.Text`
-  font-size: 12px;
-  color: #888888;
-`;
-
-const Separator = styled.View`
-  height: 1px;
-  background-color: #f5f5f5;
-  margin-left: 70px;
-`;
-
-const InfoSection = styled.View`
-  padding: 24px 20px;
-  background-color: #ffffff;
-  margin-bottom: 12px;
-`;
-
-const InfoTitle = styled.Text`
-  font-size: 16px;
-  font-weight: 600;
-  color: #222222;
-  margin-bottom: 16px;
-`;
-
-const InfoItem = styled.View`
-  flex-direction: row;
-  margin-bottom: 10px;
-`;
-
-const InfoBullet = styled.View`
-  width: 6px;
-  height: 6px;
-  border-radius: 3px;
-  background-color: #666666;
-  margin-top: 6px;
-  margin-right: 10px;
-`;
-
-const InfoText = styled.Text`
-  flex: 1;
-  font-size: 14px;
-  color: #666666;
-  line-height: 20px;
-`;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.secondary50,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.white,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  balanceSection: {
+    padding: 24,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.white,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  balanceLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.text,
+    letterSpacing: -0.3,
+    marginBottom: 8,
+  },
+  amountText: {
+    fontSize: 34,
+    fontWeight: "700",
+    color: COLORS.text,
+    letterSpacing: -0.7,
+    marginBottom: 24,
+  },
+  won: {
+    fontSize: 22,
+    fontWeight: "600",
+    marginLeft: 2,
+  },
+  chargeButton: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.primary600,
+    borderRadius: 10,
+    padding: 14,
+    paddingHorizontal: 20,
+    width: "80%",
+    marginBottom: 16,
+  },
+  chargeButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.white,
+    marginRight: 8,
+  },
+  guideText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+  },
+  tabSection: {
+    flexDirection: "row",
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray200,
+  },
+  tabButton: {
+    flex: 1,
+    padding: 14,
+    alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  tabButtonActive: {
+    borderBottomColor: COLORS.primary600,
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: "400",
+    color: COLORS.gray500,
+  },
+  tabTextActive: {
+    fontWeight: "600",
+    color: COLORS.primary600,
+  },
+  section: {
+    padding: 24,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.white,
+    marginBottom: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.text,
+    letterSpacing: -0.3,
+  },
+  viewMapButton: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  viewMapText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.primary600,
+    marginRight: 4,
+  },
+  locationCard: {
+    flexDirection: "row",
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+  },
+  locationIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary50,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  locationContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  locationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  locationName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginRight: 8,
+  },
+  popularTag: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: COLORS.warning600,
+    backgroundColor: COLORS.warning50,
+    padding: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+  },
+  locationAddress: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  locationText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginLeft: 4,
+  },
+  locationHours: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  locationRightContent: {
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+  },
+  statusContainer: {
+    padding: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+  statusContainerOpen: {
+    backgroundColor: COLORS.success50,
+  },
+  statusContainerClosed: {
+    backgroundColor: COLORS.warning50,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  statusTextOpen: {
+    color: COLORS.success600,
+  },
+  statusTextClosed: {
+    color: COLORS.warning600,
+  },
+  distanceText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    margin: 4,
+    marginVertical: 4,
+  },
+  navigateButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary50,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  paymentMethodSection: {
+    marginTop: 24,
+  },
+  methodTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: 16,
+  },
+  methodRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  methodItem: {
+    alignItems: "center",
+    width: "30%",
+  },
+  methodIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  methodLabel: {
+    fontSize: 14,
+    color: COLORS.gray600,
+  },
+  historyCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+  },
+  historyItem: {
+    flexDirection: "row",
+    padding: 16,
+    alignItems: "center",
+  },
+  historyIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primary50,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  historyContent: {
+    flex: 1,
+  },
+  historyAmount: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.primary600,
+    marginBottom: 4,
+  },
+  historyDetails: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  historyLocation: {
+    fontSize: 14,
+    color: COLORS.gray600,
+    marginRight: 8,
+  },
+  methodPill: {
+    backgroundColor: COLORS.gray100,
+    padding: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+  },
+  methodPillText: {
+    fontSize: 11,
+    color: COLORS.gray600,
+  },
+  historyTime: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: COLORS.gray100,
+    marginLeft: 70,
+  },
+  infoSection: {
+    padding: 24,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.white,
+    marginBottom: 12,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: 16,
+  },
+  infoItem: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
+  infoBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.gray600,
+    marginTop: 6,
+    marginRight: 10,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.gray600,
+    lineHeight: 20,
+  },
+});

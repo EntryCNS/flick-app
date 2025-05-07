@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { StatusBar, StyleSheet, Animated, Platform } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  ActivityIndicator,
+  StatusBar,
+  Animated,
+  Dimensions,
+} from "react-native";
 import {
   CameraView,
   useCameraPermissions,
@@ -7,15 +17,15 @@ import {
 } from "expo-camera";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import styled from "@emotion/native";
-import { useTheme } from "@emotion/react";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { COLORS } from "@/constants/colors";
+
+const { width } = Dimensions.get("window");
+const scale = (size: number) => (width / 375) * size;
 
 export default function QRScannerScreen() {
-  const theme = useTheme();
   const [scanned, setScanned] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
-  const scanAnimation = React.useRef(new Animated.Value(0)).current;
+  const scanAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -49,240 +59,249 @@ export default function QRScannerScreen() {
 
   if (!permission) {
     return (
-      <SafeArea>
-        <Container>
-          <Title>카메라 권한을 확인하는 중입니다...</Title>
-        </Container>
-      </SafeArea>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary600} />
+          <Text style={styles.loadingText}>
+            카메라 권한을 확인하는 중입니다...
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!permission.granted) {
     return (
-      <SafeArea>
-        <Container>
-          <Title>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.permissionContainer}>
+          <Text style={styles.title}>
             결제 QR 코드 스캔을 위해{"\n"}카메라 접근 권한이 필요합니다.
-          </Title>
-          <SubmitButton onPress={requestPermission} isValid={true}>
-            <ButtonText>권한 허용하기</ButtonText>
-          </SubmitButton>
-        </Container>
-      </SafeArea>
+          </Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={requestPermission}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.buttonText}>권한 허용하기</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <ScannerContainer>
-        <CameraView
-          style={styles.camera}
-          facing="back"
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-          barcodeScannerSettings={{
-            barcodeTypes: ["qr"],
-          }}
-        >
-          <OverlayContainer>
-            <SafeAreaView edges={["top"]}>
-              <Header>
-                <BackButton onPress={() => router.back()}>
-                  <Ionicons name="chevron-back" size={24} color="white" />
-                </BackButton>
-              </Header>
-            </SafeAreaView>
+      <CameraView
+        style={styles.camera}
+        facing="back"
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{
+          barcodeTypes: ["qr"],
+        }}
+      >
+        <View style={styles.overlay}>
+          <SafeAreaView style={styles.headerContainer}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="chevron-back" size={24} color={COLORS.white} />
+            </TouchableOpacity>
+          </SafeAreaView>
 
-            <ScanArea>
-              <ScanFrame>
-                <AnimatedCorner
-                  style={{
-                    top: 0,
-                    left: 0,
-                    borderTopWidth: 6,
-                    borderLeftWidth: 6,
+          <View style={styles.scanAreaContainer}>
+            <View style={styles.scanFrame}>
+              <Animated.View
+                style={[
+                  styles.corner,
+                  styles.topLeft,
+                  {
                     borderColor: scanAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [
-                        theme.colors.primary[500],
-                        theme.colors.primary[300],
-                      ],
+                      outputRange: [COLORS.primary500, COLORS.primary300],
                     }),
-                  }}
-                />
-                <AnimatedCorner
-                  style={{
-                    top: 0,
-                    right: 0,
-                    borderTopWidth: 6,
-                    borderRightWidth: 6,
+                  },
+                ]}
+              />
+              <Animated.View
+                style={[
+                  styles.corner,
+                  styles.topRight,
+                  {
                     borderColor: scanAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [
-                        theme.colors.primary[500],
-                        theme.colors.primary[300],
-                      ],
+                      outputRange: [COLORS.primary500, COLORS.primary300],
                     }),
-                  }}
-                />
-                <AnimatedCorner
-                  style={{
-                    bottom: 0,
-                    left: 0,
-                    borderBottomWidth: 6,
-                    borderLeftWidth: 6,
+                  },
+                ]}
+              />
+              <Animated.View
+                style={[
+                  styles.corner,
+                  styles.bottomLeft,
+                  {
                     borderColor: scanAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [
-                        theme.colors.primary[500],
-                        theme.colors.primary[300],
-                      ],
+                      outputRange: [COLORS.primary500, COLORS.primary300],
                     }),
-                  }}
-                />
-                <AnimatedCorner
-                  style={{
-                    bottom: 0,
-                    right: 0,
-                    borderBottomWidth: 6,
-                    borderRightWidth: 6,
+                  },
+                ]}
+              />
+              <Animated.View
+                style={[
+                  styles.corner,
+                  styles.bottomRight,
+                  {
                     borderColor: scanAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [
-                        theme.colors.primary[500],
-                        theme.colors.primary[300],
-                      ],
+                      outputRange: [COLORS.primary500, COLORS.primary300],
                     }),
-                  }}
-                />
-              </ScanFrame>
-            </ScanArea>
+                  },
+                ]}
+              />
+            </View>
+          </View>
 
-            <SafeAreaView edges={["bottom"]}>
-              <ButtonContainer>
-                <InfoText>결제 QR 코드를 프레임 안에 위치시켜주세요</InfoText>
-                {scanned && (
-                  <SubmitButton
-                    onPress={() => setScanned(false)}
-                    isValid={true}
-                  >
-                    <ButtonText>다시 스캔하기</ButtonText>
-                  </SubmitButton>
-                )}
-              </ButtonContainer>
-            </SafeAreaView>
-          </OverlayContainer>
-        </CameraView>
-      </ScannerContainer>
-    </>
+          <SafeAreaView style={styles.bottomContainer}>
+            <Text style={styles.infoText}>
+              결제 QR 코드를 프레임 안에 위치시켜주세요
+            </Text>
+            {scanned && (
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => setScanned(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.buttonText}>다시 스캔하기</Text>
+              </TouchableOpacity>
+            )}
+          </SafeAreaView>
+        </View>
+      </CameraView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: scale(24),
+  },
+  loadingText: {
+    fontSize: scale(16),
+    marginTop: scale(16),
+    color: COLORS.text,
+    textAlign: "center",
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: scale(24),
+  },
+  title: {
+    fontSize: scale(24),
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: scale(40),
+    lineHeight: scale(34),
+    textAlign: "center",
+  },
+  button: {
+    width: "100%",
+    height: scale(52),
+    backgroundColor: COLORS.primary600,
+    borderRadius: scale(8),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonText: {
+    fontSize: scale(16),
+    fontWeight: "600",
+    color: COLORS.white,
+  },
   camera: {
     flex: 1,
   },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  headerContainer: {
+    paddingHorizontal: scale(16),
+    paddingTop: scale(12),
+  },
+  backButton: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanAreaContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scanFrame: {
+    width: scale(260),
+    height: scale(260),
+    position: "relative",
+  },
+  corner: {
+    position: "absolute",
+    width: scale(30),
+    height: scale(30),
+    borderWidth: scale(6),
+  },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: scale(6),
+    borderLeftWidth: scale(6),
+    borderBottomWidth: 0,
+    borderRightWidth: 0,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: scale(6),
+    borderRightWidth: scale(6),
+    borderBottomWidth: 0,
+    borderLeftWidth: 0,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: scale(6),
+    borderLeftWidth: scale(6),
+    borderTopWidth: 0,
+    borderRightWidth: 0,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: scale(6),
+    borderRightWidth: scale(6),
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
+  },
+  bottomContainer: {
+    padding: scale(24),
+    alignItems: "center",
+  },
+  infoText: {
+    fontSize: scale(14),
+    color: COLORS.white,
+    textAlign: "center",
+    marginBottom: scale(16),
+  },
 });
-
-// 로그인 페이지와 일관된 스타일링
-const SafeArea = styled.SafeAreaView`
-  flex: 1;
-  background-color: ${({ theme }) => theme.colors.background.default};
-`;
-
-const Container = styled.View`
-  flex: 1;
-  justify-content: center;
-  align-items: center;
-  background-color: ${({ theme }) => theme.colors.background.default};
-  padding: 16px 24px;
-`;
-
-const Title = styled.Text`
-  font-size: 24px;
-  font-weight: 700;
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin-top: 16px;
-  margin-bottom: 48px;
-  line-height: 34px;
-  text-align: center;
-`;
-
-interface ButtonProps {
-  isValid: boolean;
-}
-
-const SubmitButton = styled.TouchableOpacity<ButtonProps>`
-  width: 100%;
-  height: 52px;
-  border-radius: 8px;
-  background-color: ${({ isValid, theme }) =>
-    isValid ? theme.colors.primary[500] : theme.colors.gray[200]};
-  justify-content: center;
-  align-items: center;
-`;
-
-const ButtonText = styled.Text`
-  font-size: 16px;
-  font-weight: 700;
-  color: ${({ theme }) => theme.colors.text.inverse};
-`;
-
-const ScannerContainer = styled.View`
-  flex: 1;
-  background-color: ${({ theme }) => theme.colors.background.default};
-`;
-
-const OverlayContainer = styled.View`
-  flex: 1;
-  background-color: rgba(0, 0, 0, 0.4);
-`;
-
-const Header = styled.View`
-  padding: 16px 16px 0;
-  flex-direction: row;
-  align-items: center;
-`;
-
-const BackButton = styled.TouchableOpacity`
-  padding: 8px;
-  margin-left: -8px;
-  width: 40px;
-  height: 40px;
-  border-radius: 20px;
-  background-color: rgba(0, 0, 0, 0.3);
-  align-items: center;
-  justify-content: center;
-`;
-
-const ScanArea = styled.View`
-  flex: 1;
-  justify-content: center;
-  align-items: center;
-`;
-
-const ScanFrame = styled.View`
-  width: 260px;
-  height: 260px;
-  position: relative;
-`;
-
-const Corner = styled(Animated.View)`
-  position: absolute;
-  width: 30px;
-  height: 30px;
-`;
-
-const AnimatedCorner = Animated.createAnimatedComponent(Corner);
-
-const ButtonContainer = styled.View`
-  padding: 16px 24px;
-  align-items: center;
-`;
-
-const InfoText = styled.Text`
-  font-size: 14px;
-  color: white;
-  text-align: center;
-  margin-bottom: 16px;
-`;
