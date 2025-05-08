@@ -18,15 +18,17 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.flick.app"
+      "bundleIdentifier": "com.flick.core",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.flick.app",
-      "googleServicesFile": "./google-services.json"
+      "package": "com.flick.core"
     },
     "web": {
       "bundler": "metro",
@@ -43,7 +45,15 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification.png",
+          "color": "#6366F1",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

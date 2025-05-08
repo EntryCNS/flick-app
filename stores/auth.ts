@@ -5,65 +5,64 @@ import api from "@/libs/api";
 import { useNotificationStore } from "./notification";
 
 interface AuthState {
-  isAuthenticated: boolean;
+  isLoggedIn: boolean;
   user: User | null;
 }
 
 interface AuthActions {
-  setTokens: (tokens: AuthTokens) => Promise<void>;
-  setUser: (user: User) => void;
-  fetchUserProfile: () => Promise<void>;
-  logout: () => Promise<void>;
+  saveTokens: (tokens: AuthTokens) => Promise<void>;
+  updateUser: (user: User) => void;
+  getProfile: () => Promise<void>;
+  signOut: () => Promise<void>;
+  checkAuth: () => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState & AuthActions>((set) => ({
-  isAuthenticated: false,
+  isLoggedIn: false,
   user: null,
 
-  setTokens: async ({
+  saveTokens: async ({
     accessToken,
     refreshToken,
   }: AuthTokens): Promise<void> => {
     await SecureStore.setItemAsync("access_token", accessToken);
     await SecureStore.setItemAsync("refresh_token", refreshToken);
-    set({ isAuthenticated: true });
-
+    set({ isLoggedIn: true });
     const { registerToken } = useNotificationStore.getState();
     await registerToken();
   },
 
-  setUser: (user: User): void => set({ user }),
+  updateUser: (user: User): void => set({ user }),
 
-  fetchUserProfile: async (): Promise<void> => {
+  getProfile: async (): Promise<void> => {
     try {
       const { data } = await api.get<User>("/users/me");
       set({ user: data });
     } catch (error) {
-      console.error("Failed to fetch user profile", error);
+      console.error("프로필 정보 가져오기 실패", error);
     }
   },
 
-  logout: async (): Promise<void> => {
+  signOut: async (): Promise<void> => {
     const { unregisterToken } = useNotificationStore.getState();
     await unregisterToken();
-
     await SecureStore.deleteItemAsync("access_token");
     await SecureStore.deleteItemAsync("refresh_token");
-    set({ isAuthenticated: false, user: null });
+    set({ isLoggedIn: false, user: null });
+  },
+
+  checkAuth: async (): Promise<boolean> => {
+    try {
+      const accessToken = await SecureStore.getItemAsync("access_token");
+      const refreshToken = await SecureStore.getItemAsync("refresh_token");
+
+      if (accessToken && refreshToken) {
+        set({ isLoggedIn: true });
+        return true;
+      }
+    } catch (error) {
+      console.error("토큰 확인 실패", error);
+    }
+    return false;
   },
 }));
-
-export const loadTokens = async (): Promise<boolean> => {
-  try {
-    const accessToken = await SecureStore.getItemAsync("access_token");
-    const refreshToken = await SecureStore.getItemAsync("refresh_token");
-
-    if (accessToken && refreshToken) {
-      useAuthStore.setState({ isAuthenticated: true });
-      return true;
-    }
-  } catch (error) {
-    console.error("Failed to load tokens", error);
-  }
-  return false;
-};

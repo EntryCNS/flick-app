@@ -1,18 +1,21 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
-  ScrollView,
-  StatusBar,
-  Animated,
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
+  StatusBar,
+  TouchableOpacity,
+  Animated,
+  RefreshControl,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import api from "@/libs/api";
 import { COLORS } from "@/constants/colors";
+import { Stack } from "expo-router";
+import { useAuthStore } from "@/stores/auth";
 
 interface Transaction {
   id: number;
@@ -28,272 +31,325 @@ interface Transaction {
   createdAt: string;
 }
 
-export default function HomeScreen(): React.ReactElement {
+interface TransactionItemProps {
+  transaction: Transaction;
+  isLast: boolean;
+  formatAmount: (amount: number, type: string) => string;
+  formatTime: (dateTimeString: string) => string;
+}
+
+const BACKGROUND_COLOR = "#F5F6F8";
+
+const TransactionItem: React.FC<TransactionItemProps> = ({
+  transaction,
+  isLast,
+  formatAmount,
+  formatTime,
+}) => {
+  const isCharge = transaction.type === "CHARGE";
+
+  const formatDate = (dateString: string): string => {
+    const today = new Date();
+    const date = new Date(dateString);
+
+    if (today.toDateString() === date.toDateString()) {
+      return "오늘";
+    }
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (yesterday.toDateString() === date.toDateString()) {
+      return "어제";
+    }
+
+    return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.transactionItem}
+      activeOpacity={0.6}
+      onPress={() => router.push(`/transactions/${transaction.id}`)}
+    >
+      <View style={styles.transactionRow}>
+        <Text style={styles.transactionName} numberOfLines={1}>
+          {isCharge ? "포인트 충전" : transaction.product.name}
+        </Text>
+        <Text
+          style={[
+            styles.transactionAmount,
+            isCharge ? styles.amountPositive : styles.amountNegative,
+          ]}
+        >
+          {formatAmount(transaction.amount, transaction.type)}원
+        </Text>
+      </View>
+
+      <View style={styles.transactionMetaRow}>
+        <Text style={styles.transactionDate}>
+          {formatDate(transaction.createdAt)}{" "}
+          {formatTime(transaction.createdAt)}
+        </Text>
+        <Text style={styles.transactionPlace} numberOfLines={1}>
+          {isCharge ? transaction.memo || "" : transaction.booth.name}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const [balance, setBalance] = useState<number>(0);
+  const { user } = useAuthStore();
+  const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const generateIcon = (): keyof typeof Ionicons.glyphMap => {
-    const icons: (keyof typeof Ionicons.glyphMap)[] = [
-      "card-outline",
-      "bag-outline",
-      "person-outline",
-      "wallet-outline",
-      "cart-outline",
-    ];
-    return icons[Math.floor(Math.random() * icons.length)];
-  };
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const refreshAnim = useRef(new Animated.Value(0)).current;
 
-  const generateIconBackground = (type: string): string => {
-    let hash = 0;
-    for (let i = 0; i < type.length; i++) {
-      hash = type.charCodeAt(i) + ((hash << 5) - hash);
-    }
+  const headerBackgroundColor = scrollY.interpolate({
+    inputRange: [0, 50],
+    outputRange: [BACKGROUND_COLOR, COLORS.white],
+    extrapolate: "clamp",
+  });
 
-    const h = Math.abs(hash) % 360;
-    const s = 60 + (Math.abs(hash) % 20);
-    const l = 80 + (Math.abs(hash) % 10);
+  const spin = refreshAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
-    return `hsl(${h}, ${s}%, ${l}%)`;
-  };
-
-  const fetchBalance = async (): Promise<void> => {
-    try {
-      const { data } = await api.get("/users/me/balance");
-      setBalance(data);
-    } catch (error) {
-      console.error("Failed to fetch balance:", error);
-    }
-  };
-
-  const fetchTransactions = async (): Promise<void> => {
-    try {
-      const { data } = await api.get("/transactions/my");
-      setTransactions(data);
-    } catch (error) {
-      console.error("Failed to fetch transactions:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchBalance();
-    fetchTransactions();
-  }, []);
-
-  const formatAmount = (amount: number, type: string): string => {
+  const formatAmount = useCallback((amount: number, type: string): string => {
     const formattedNum = Math.abs(amount).toLocaleString("ko-KR");
     return type === "CHARGE" ? `+${formattedNum}` : `-${formattedNum}`;
-  };
+  }, []);
 
-  const formatTime = (dateTimeString: string): string => {
+  const formatTime = useCallback((dateTimeString: string): string => {
     const date = new Date(dateTimeString);
     return date.toLocaleTimeString("ko-KR", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
     });
-  };
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      setRefreshing(true);
+
+      Animated.timing(refreshAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start();
+
+      const [balanceResponse, transactionsResponse] = await Promise.all([
+        api.get("/users/me/balance"),
+        api.get("/transactions/my"),
+      ]);
+
+      setBalance(balanceResponse.data);
+      setTransactions(transactionsResponse.data);
+
+      refreshAnim.setValue(0);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user, refreshAnim]);
+
+  const handleRefresh = useCallback(() => {
+    if (!refreshing) {
+      fetchData();
+    }
+  }, [refreshing, fetchData]);
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user, fetchData]);
+
+  // If there's no user, we should render a loading state or redirect
+  if (!user) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor="transparent"
+        backgroundColor={BACKGROUND_COLOR}
         translucent
       />
 
+      <Stack.Screen options={{ headerShown: false }} />
+
       <Animated.View
-        style={{
-          shadowOpacity: scrollY.interpolate({
-            inputRange: [0, 50],
-            outputRange: [0, 0.1],
-            extrapolate: "clamp",
-          }),
-          zIndex: 10,
-          shadowOffset: { width: 0, height: 2 },
-          shadowRadius: 8,
-          shadowColor: COLORS.black,
-          backgroundColor: COLORS.white,
-        }}
+        style={[styles.header, { backgroundColor: headerBackgroundColor }]}
       >
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Text style={styles.brandName}>
-              <Text style={styles.coloredText}>F</Text>lick
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.iconButton}>
+        <Text style={styles.logoText}>
+          <Text style={styles.highlightText}>F</Text>lick
+        </Text>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={handleRefresh}
+            disabled={refreshing}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Animated.View style={{ transform: [{ rotate: spin }] }}>
+              <Ionicons
+                name="refresh-outline"
+                size={18}
+                color={refreshing ? COLORS.primary500 : COLORS.text}
+              />
+            </Animated.View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => router.push("/notifications")}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Ionicons
               name="notifications-outline"
-              size={22}
+              size={18}
               color={COLORS.text}
             />
-            <View style={styles.notificationDot} />
+            <View style={styles.notificationBadge} />
           </TouchableOpacity>
         </View>
       </Animated.View>
 
-      <ScrollView
+      <Animated.ScrollView
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary500}
+            colors={[COLORS.primary500]}
+            progressBackgroundColor={COLORS.white}
+            progressViewOffset={20}
+          />
+        }
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
         )}
         scrollEventThrottle={16}
       >
-        <View style={styles.balanceSection}>
-          <Text style={styles.balanceLabel}>남은 포인트</Text>
-          <Text style={styles.amountText}>
-            {balance}
-            <Text style={styles.won}>P</Text>
-          </Text>
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.7}
+          onPress={() => router.push("/qr-scanner")}
+        >
+          <View style={styles.cardInner}>
+            <Text style={styles.cardTitle}>결제하기</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+          </View>
+        </TouchableOpacity>
 
-          <View style={styles.quickAccessRow}>
-            <TouchableOpacity
-              style={[
-                styles.quickButton,
-                { backgroundColor: COLORS.primary50 },
-              ]}
-              onPress={() => router.push("/qr-scanner")}
-            >
-              <View
-                style={[
-                  styles.quickButtonIcon,
-                  { borderColor: COLORS.primary600 + "20" },
-                ]}
-              >
-                <Ionicons name="qr-code" size={18} color={COLORS.primary600} />
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.7}
+          // onPress={() => router.push("/accounts")}
+        >
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>계좌</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.accountContainer}
+            activeOpacity={0.7}
+            // onPress={() => router.push(`/accounts`)}
+          >
+            <View style={styles.accountLogoContainer}>
+              <Image
+                source={require("@/assets/images/logo.png")}
+                style={styles.accountLogo}
+                resizeMode="contain"
+              />
+            </View>
+
+            <View style={styles.accountDetails}>
+              <Text style={styles.accountName}>{user.name}님의 통장</Text>
+              <View style={styles.balanceRow}>
+                <Text style={styles.accountBalance}>
+                  {balance.toLocaleString()}
+                </Text>
+                <Text style={styles.wonText}>원</Text>
               </View>
-              <Text style={styles.quickButtonText}>QR결제</Text>
-            </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.quickButton,
-                { backgroundColor: COLORS.success50 },
-              ]}
-              onPress={() => router.push("/charge-point")}
-            >
-              <View
-                style={[
-                  styles.quickButtonIcon,
-                  { borderColor: COLORS.success600 + "20" },
-                ]}
-              >
-                <Ionicons name="card" size={18} color={COLORS.success600} />
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.7}
+          onPress={() => router.push("/transactions")}
+        >
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>결제 내역</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+          </View>
+
+          <View style={styles.transactionsList}>
+            {loading ? (
+              <View style={styles.emptyContainer}>
+                <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                  <Ionicons
+                    name="refresh-outline"
+                    size={22}
+                    color={COLORS.gray300}
+                  />
+                </Animated.View>
+                <Text style={styles.emptyText}>내역을 불러오는 중...</Text>
               </View>
-              <Text style={styles.quickButtonText}>충전</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.quickButton,
-                { backgroundColor: COLORS.warning50 },
-              ]}
-              onPress={() => router.push("/booth-map")}
-            >
-              <View
-                style={[
-                  styles.quickButtonIcon,
-                  { borderColor: COLORS.warning600 + "20" },
-                ]}
-              >
-                <Ionicons name="map" size={18} color={COLORS.warning600} />
-              </View>
-              <Text style={styles.quickButtonText}>부스맵</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickButton, { backgroundColor: COLORS.info50 }]}
-              onPress={() => router.push("/info-guide")}
-            >
-              <View
-                style={[
-                  styles.quickButtonIcon,
-                  { borderColor: COLORS.info600 + "20" },
-                ]}
-              >
+            ) : transactions.length === 0 ? (
+              <View style={styles.emptyContainer}>
                 <Ionicons
-                  name="information-circle"
-                  size={18}
-                  color={COLORS.info600}
+                  name="receipt-outline"
+                  size={22}
+                  color={COLORS.gray300}
                 />
+                <Text style={styles.emptyText}>거래 내역이 없습니다</Text>
               </View>
-              <Text style={styles.quickButtonText}>안내</Text>
-            </TouchableOpacity>
+            ) : (
+              <View style={styles.transactionsContent}>
+                {transactions.slice(0, 3).map((transaction, index) => (
+                  <TransactionItem
+                    key={transaction.id}
+                    transaction={transaction}
+                    isLast={index === Math.min(2, transactions.length - 1)}
+                    formatAmount={formatAmount}
+                    formatTime={formatTime}
+                  />
+                ))}
+              </View>
+            )}
           </View>
-        </View>
-
-        <View style={styles.transactionSection}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>결제 내역</Text>
-          </View>
-
-          <View style={styles.transactionsCard}>
-            {transactions.map((transaction, index) => (
-              <React.Fragment key={transaction.id}>
-                <TouchableOpacity style={styles.transactionItem}>
-                  <View
-                    style={[
-                      styles.transactionIcon,
-                      {
-                        backgroundColor: generateIconBackground(
-                          transaction.type
-                        ),
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={generateIcon()}
-                      size={18}
-                      color={COLORS.white}
-                    />
-                  </View>
-
-                  <View style={styles.transactionContent}>
-                    <Text style={styles.transactionTitle}>
-                      {transaction.type === "PAYMENT"
-                        ? transaction.product.name
-                        : "충전"}
-                    </Text>
-                    <Text style={styles.transactionMenu}>
-                      {transaction.type === "PAYMENT"
-                        ? transaction.booth.name
-                        : transaction.memo || ""}
-                    </Text>
-                  </View>
-
-                  <View style={styles.amountView}>
-                    <Text
-                      style={[
-                        styles.transactionAmount,
-                        transaction.type === "CHARGE" &&
-                          styles.transactionAmountPositive,
-                      ]}
-                    >
-                      {formatAmount(transaction.amount, transaction.type)}P
-                    </Text>
-                    <Text style={styles.transactionTime}>
-                      {formatTime(transaction.createdAt)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                {index < transactions.length - 1 && (
-                  <View style={styles.separator} />
-                )}
-              </React.Fragment>
-            ))}
-
-            <TouchableOpacity style={styles.showMoreButton}>
-              <Text style={styles.showMoreText}>내역 더보기</Text>
-              <Ionicons name="chevron-down" size={14} color={COLORS.gray600} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
+        </TouchableOpacity>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -301,179 +357,182 @@ export default function HomeScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.secondary50,
+    backgroundColor: BACKGROUND_COLOR,
   },
   header: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    padding: 12,
     paddingHorizontal: 20,
-    backgroundColor: COLORS.white,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
   },
-  logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  brandName: {
-    fontSize: 24,
-    fontWeight: "700",
+  logoText: {
+    fontSize: 22,
+    fontWeight: "600",
     color: COLORS.text,
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
-  coloredText: {
+  highlightText: {
     color: COLORS.primary600,
   },
-  iconButton: {
-    width: 38,
-    height: 38,
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerButton: {
+    width: 32,
+    height: 32,
     justifyContent: "center",
     alignItems: "center",
-    position: "relative",
   },
-  notificationDot: {
+  notificationBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: COLORS.danger500,
-    position: "absolute",
-    top: 9,
-    right: 9,
   },
-  balanceSection: {
-    padding: 24,
-    paddingHorizontal: 20,
+  scrollContent: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  card: {
     backgroundColor: COLORS.white,
-    marginBottom: 12,
+    borderRadius: 16,
+    overflow: "hidden",
   },
-  balanceLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.text,
-    letterSpacing: -0.3,
-    marginBottom: 8,
-  },
-  amountText: {
-    fontSize: 34,
-    fontWeight: "700",
-    color: COLORS.text,
-    letterSpacing: -0.7,
-    marginBottom: 24,
-  },
-  won: {
-    fontSize: 22,
-    fontWeight: "600",
-    marginLeft: 2,
-  },
-  quickAccessRow: {
+  cardInner: {
     flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  quickButton: {
     alignItems: "center",
-    padding: 10,
-    borderRadius: 10,
-    width: "22%",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
   },
-  quickButtonIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.white,
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  accountContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+  },
+  accountLogoContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primary50,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 6,
-    borderWidth: 1,
+    marginRight: 14,
   },
-  quickButtonText: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: COLORS.text,
+  accountLogo: {
+    width: 28,
+    height: 28,
   },
-  transactionSection: {
-    padding: 0,
-    paddingHorizontal: 20,
-    marginBottom: 16,
+  accountDetails: {
+    flex: 1,
   },
-  sectionHeaderRow: {
+  accountName: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 3,
+    fontWeight: "400",
+  },
+  balanceRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
+    alignItems: "baseline",
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
+  accountBalance: {
+    fontSize: 20,
+    fontWeight: "600",
     color: COLORS.text,
-    letterSpacing: -0.3,
   },
-  transactionsCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: COLORS.gray200,
+  wonText: {
+    fontSize: 14,
+    fontWeight: "400",
+    color: COLORS.text,
+    marginLeft: 2,
+    marginBottom: 0,
+  },
+  transactionsList: {
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+  },
+  transactionsContent: {
+    gap: 10,
+  },
+  emptyContainer: {
+    padding: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    marginTop: 10,
+    fontSize: 14,
+    fontWeight: "400",
+    color: COLORS.gray500,
   },
   transactionItem: {
+    paddingVertical: 10,
+    marginBottom: 2,
+    backgroundColor: "white",
+    borderRadius: 8,
+  },
+  transactionRow: {
     flexDirection: "row",
-    padding: 18,
+    justifyContent: "space-between",
     alignItems: "center",
-  },
-  transactionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  transactionContent: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  transactionTitle: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: COLORS.text,
-    letterSpacing: -0.2,
     marginBottom: 4,
   },
-  transactionMenu: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
+  transactionMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  amountView: {
-    alignItems: "flex-end",
+  transactionName: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: COLORS.text,
+    flex: 1,
+    marginRight: 8,
   },
   transactionAmount: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
-    color: COLORS.text,
-    letterSpacing: -0.2,
-    marginBottom: 4,
   },
-  transactionAmountPositive: {
-    color: COLORS.primary600,
-  },
-  transactionTime: {
+  transactionDate: {
     fontSize: 12,
     color: COLORS.textSecondary,
+    fontWeight: "400",
   },
-  separator: {
-    height: 1,
-    backgroundColor: COLORS.gray100,
-    marginLeft: 76,
+  transactionPlace: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: "400",
+    textAlign: "right",
+    maxWidth: 140,
   },
-  showMoreButton: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: COLORS.gray50,
+  amountPositive: {
+    color: COLORS.success600,
   },
-  showMoreText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.gray600,
-    marginRight: 4,
+  amountNegative: {
+    color: COLORS.danger600,
   },
 });

@@ -4,12 +4,11 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
   StatusBar,
   Animated,
-  Dimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   CameraView,
   useCameraPermissions,
@@ -18,9 +17,6 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
-
-const { width } = Dimensions.get("window");
-const scale = (size: number) => (width / 375) * size;
 
 export default function QRScannerScreen() {
   const [scanned, setScanned] = useState(false);
@@ -33,12 +29,12 @@ export default function QRScannerScreen() {
         Animated.timing(scanAnimation, {
           toValue: 1,
           duration: 1500,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(scanAnimation, {
           toValue: 0,
           duration: 1500,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
       ])
     );
@@ -59,9 +55,10 @@ export default function QRScannerScreen() {
 
   if (!permission) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary600} />
+          <ActivityIndicator size="large" color={COLORS.primary500} />
           <Text style={styles.loadingText}>
             카메라 권한을 확인하는 중입니다...
           </Text>
@@ -72,10 +69,11 @@ export default function QRScannerScreen() {
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
         <View style={styles.permissionContainer}>
           <Text style={styles.title}>
-            결제 QR 코드 스캔을 위해{"\n"}카메라 접근 권한이 필요합니다.
+            결제 QR 코드 스캔을 위해{"\n"}카메라 접근 권한이 필요합니다
           </Text>
           <TouchableOpacity
             style={styles.button}
@@ -91,7 +89,11 @@ export default function QRScannerScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
       <CameraView
         style={styles.camera}
         facing="back"
@@ -100,15 +102,16 @@ export default function QRScannerScreen() {
           barcodeTypes: ["qr"],
         }}
       >
-        <View style={styles.overlay}>
-          <SafeAreaView style={styles.headerContainer}>
+        <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
+          <View style={styles.headerContainer}>
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.back()}
+              activeOpacity={0.7}
             >
               <Ionicons name="chevron-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
-          </SafeAreaView>
+          </View>
 
           <View style={styles.scanAreaContainer}>
             <View style={styles.scanFrame}>
@@ -117,9 +120,10 @@ export default function QRScannerScreen() {
                   styles.corner,
                   styles.topLeft,
                   {
-                    borderColor: scanAnimation.interpolate({
+                    borderColor: COLORS.primary500,
+                    opacity: scanAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [COLORS.primary500, COLORS.primary300],
+                      outputRange: [0.7, 1],
                     }),
                   },
                 ]}
@@ -129,9 +133,10 @@ export default function QRScannerScreen() {
                   styles.corner,
                   styles.topRight,
                   {
-                    borderColor: scanAnimation.interpolate({
+                    borderColor: COLORS.primary500,
+                    opacity: scanAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [COLORS.primary500, COLORS.primary300],
+                      outputRange: [0.7, 1],
                     }),
                   },
                 ]}
@@ -141,9 +146,10 @@ export default function QRScannerScreen() {
                   styles.corner,
                   styles.bottomLeft,
                   {
-                    borderColor: scanAnimation.interpolate({
+                    borderColor: COLORS.primary500,
+                    opacity: scanAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [COLORS.primary500, COLORS.primary300],
+                      outputRange: [0.7, 1],
                     }),
                   },
                 ]}
@@ -153,9 +159,10 @@ export default function QRScannerScreen() {
                   styles.corner,
                   styles.bottomRight,
                   {
-                    borderColor: scanAnimation.interpolate({
+                    borderColor: COLORS.primary500,
+                    opacity: scanAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [COLORS.primary500, COLORS.primary300],
+                      outputRange: [0.7, 1],
                     }),
                   },
                 ]}
@@ -163,10 +170,11 @@ export default function QRScannerScreen() {
             </View>
           </View>
 
-          <SafeAreaView style={styles.bottomContainer}>
+          <View style={styles.bottomContainer}>
             <Text style={styles.infoText}>
               결제 QR 코드를 프레임 안에 위치시켜주세요
             </Text>
+
             {scanned && (
               <TouchableOpacity
                 style={styles.button}
@@ -176,8 +184,8 @@ export default function QRScannerScreen() {
                 <Text style={styles.buttonText}>다시 스캔하기</Text>
               </TouchableOpacity>
             )}
-          </SafeAreaView>
-        </View>
+          </View>
+        </SafeAreaView>
       </CameraView>
     </View>
   );
@@ -192,11 +200,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: scale(24),
+    padding: 24,
   },
   loadingText: {
-    fontSize: scale(16),
-    marginTop: scale(16),
+    fontSize: 16,
+    marginTop: 16,
     color: COLORS.text,
     textAlign: "center",
   },
@@ -204,26 +212,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: scale(24),
+    padding: 24,
   },
   title: {
-    fontSize: scale(24),
+    fontSize: 22,
     fontWeight: "700",
     color: COLORS.text,
-    marginBottom: scale(40),
-    lineHeight: scale(34),
+    marginBottom: 40,
+    lineHeight: 32,
     textAlign: "center",
   },
   button: {
     width: "100%",
-    height: scale(52),
-    backgroundColor: COLORS.primary600,
-    borderRadius: scale(8),
+    maxWidth: 280,
+    height: 52,
+    backgroundColor: COLORS.primary500,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
   },
   buttonText: {
-    fontSize: scale(16),
+    fontSize: 16,
     fontWeight: "600",
     color: COLORS.white,
   },
@@ -232,16 +241,18 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   headerContainer: {
-    paddingHorizontal: scale(16),
-    paddingTop: scale(12),
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   backButton: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     alignItems: "center",
     justifyContent: "center",
@@ -252,56 +263,61 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   scanFrame: {
-    width: scale(260),
-    height: scale(260),
+    width: 260,
+    height: 260,
     position: "relative",
   },
   corner: {
     position: "absolute",
-    width: scale(30),
-    height: scale(30),
-    borderWidth: scale(6),
+    width: 30,
+    height: 30,
+    borderWidth: 6,
   },
   topLeft: {
     top: 0,
     left: 0,
-    borderTopWidth: scale(6),
-    borderLeftWidth: scale(6),
+    borderTopWidth: 6,
+    borderLeftWidth: 6,
     borderBottomWidth: 0,
     borderRightWidth: 0,
+    borderTopLeftRadius: 10,
   },
   topRight: {
     top: 0,
     right: 0,
-    borderTopWidth: scale(6),
-    borderRightWidth: scale(6),
+    borderTopWidth: 6,
+    borderRightWidth: 6,
     borderBottomWidth: 0,
     borderLeftWidth: 0,
+    borderTopRightRadius: 10,
   },
   bottomLeft: {
     bottom: 0,
     left: 0,
-    borderBottomWidth: scale(6),
-    borderLeftWidth: scale(6),
+    borderBottomWidth: 6,
+    borderLeftWidth: 6,
     borderTopWidth: 0,
     borderRightWidth: 0,
+    borderBottomLeftRadius: 10,
   },
   bottomRight: {
     bottom: 0,
     right: 0,
-    borderBottomWidth: scale(6),
-    borderRightWidth: scale(6),
+    borderBottomWidth: 6,
+    borderRightWidth: 6,
     borderTopWidth: 0,
     borderLeftWidth: 0,
+    borderBottomRightRadius: 10,
   },
   bottomContainer: {
-    padding: scale(24),
+    padding: 24,
     alignItems: "center",
   },
   infoText: {
-    fontSize: scale(14),
+    fontSize: 15,
     color: COLORS.white,
     textAlign: "center",
-    marginBottom: scale(16),
+    fontWeight: "500",
+    marginBottom: 24,
   },
 });

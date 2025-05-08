@@ -1,22 +1,25 @@
-import React, { useRef } from "react";
+import React, { useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useRouter } from "expo-router";
-import { Animated, Platform, View } from "react-native";
-import styled from "@emotion/native";
+import {
+  Platform,
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-type IconName = React.ComponentProps<typeof Ionicons>["name"];
+import { COLORS } from "@/constants/colors";
 
 export default function TabLayout() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const navigateToQRScanner = () => {
+  const navigateToQRScanner = useCallback(() => {
     router.push("/qr-scanner");
-  };
+  }, [router]);
 
-  const tabBarHeight = 56;
   const bottomInset = Platform.OS === "ios" ? insets.bottom : 0;
 
   return (
@@ -24,22 +27,20 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          height: tabBarHeight + bottomInset,
+          height: 56 + bottomInset,
           paddingBottom: bottomInset,
-          borderTopWidth: 1,
-          borderTopColor: "#F2F2F7",
-          backgroundColor: "#FFFFFF",
-          ...Platform.select({
-            ios: { shadowOpacity: 0 },
-            android: { elevation: 0 },
-          }),
+          backgroundColor: COLORS.white,
+          borderTopWidth: 0.5,
+          borderTopColor: COLORS.gray200,
+          borderTopLeftRadius: 10,
+          borderTopRightRadius: 10,
         },
-        tabBarActiveTintColor: "#315DE7",
-        tabBarInactiveTintColor: "#888888",
+        tabBarActiveTintColor: COLORS.primary600,
+        tabBarInactiveTintColor: COLORS.gray400,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "500",
-          marginBottom: 4,
+          marginTop: 2,
         },
       }}
     >
@@ -48,8 +49,22 @@ export default function TabLayout() {
         options={{
           tabBarLabel: "홈",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              name={focused ? "home" : ("home-outline" as IconName)}
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={22}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="booths"
+        options={{
+          tabBarLabel: "부스",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "grid" : "grid-outline"}
+              size={22}
               color={color}
             />
           ),
@@ -60,7 +75,34 @@ export default function TabLayout() {
         options={{
           tabBarLabel: "",
           tabBarIcon: () => null,
-          tabBarButton: () => <QRTabButton onPress={navigateToQRScanner} />,
+          tabBarButton: () => (
+            <View style={styles.qrContainer}>
+              <TouchableOpacity
+                style={styles.qrButton}
+                activeOpacity={0.85}
+                onPress={navigateToQRScanner}
+                accessible={true}
+                accessibilityLabel="QR 코드 스캔 결제"
+                accessibilityRole="button"
+              >
+                <Ionicons name="qr-code" size={22} color={COLORS.white} />
+              </TouchableOpacity>
+              <Text style={styles.qrText}>결제</Text>
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notices"
+        options={{
+          tabBarLabel: "공지",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "notifications" : "notifications-outline"}
+              size={22}
+              color={color}
+            />
+          ),
         }}
       />
       <Tabs.Screen
@@ -68,8 +110,9 @@ export default function TabLayout() {
         options={{
           tabBarLabel: "프로필",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              name={focused ? "person" : ("person-outline" as IconName)}
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={22}
               color={color}
             />
           ),
@@ -79,93 +122,23 @@ export default function TabLayout() {
   );
 }
 
-function TabIcon({ name, color }: { name: IconName; color: string }) {
-  return <Ionicons name={name} size={22} color={color} />;
-}
-
-function QRTabButton({ onPress }: { onPress: () => void }) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.92,
-      useNativeDriver: true,
-      friction: 7,
-      tension: 40,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 4,
-      tension: 40,
-    }).start();
-  };
-
-  const shadowStyle = Platform.select({
-    ios: {
-      shadowColor: "#315DE7",
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.3,
-      shadowRadius: 6,
-    },
-    android: {
-      elevation: 8,
-    },
-  });
-
-  return (
-    <CenterContainer>
-      <TabButton
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={0.8}
-      >
-        <AnimatedContent style={{ transform: [{ scale: scaleAnim }] }}>
-          <QRCircle style={shadowStyle}>
-            <Ionicons name={"qr-code" as IconName} size={24} color="white" />
-          </QRCircle>
-        </AnimatedContent>
-      </TabButton>
-      <QRLabel>결제하기</QRLabel>
-    </CenterContainer>
-  );
-}
-
-const CenterContainer = styled.View`
-  flex: 1;
-  align-items: center;
-  height: 60px;
-`;
-
-const TabButton = styled.TouchableOpacity`
-  width: 60px;
-  height: 60px;
-  align-items: center;
-  justify-content: center;
-  margin-top: -30px;
-`;
-
-const AnimatedContent = styled(Animated.View)`
-  align-items: center;
-  justify-content: center;
-`;
-
-const QRCircle = styled.View`
-  width: 52px;
-  height: 52px;
-  border-radius: 26px;
-  background-color: #315de7;
-  justify-content: center;
-  align-items: center;
-`;
-
-const QRLabel = styled.Text`
-  font-size: 11px;
-  font-weight: 500;
-  color: #315de7;
-  margin-top: 2px;
-`;
+const styles = StyleSheet.create({
+  qrContainer: {
+    alignItems: "center",
+    top: -15,
+  },
+  qrButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primary600,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: COLORS.primary600,
+    marginTop: 2,
+  },
+});

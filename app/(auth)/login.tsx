@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
 import { router } from "expo-router";
 import Toast from "react-native-toast-message";
 import { useAuthStore } from "@/stores/auth";
+import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { COLORS } from "@/constants/colors";
 import { API_URL } from "@/constants/api";
@@ -26,12 +27,17 @@ export default function LoginScreen(): React.ReactElement {
   const [password, setPassword] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [focusedInput, setFocusedInput] = useState<string>("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState<boolean>(false);
 
   const passwordRef = useRef<TextInput>(null);
-  const { setTokens, fetchUserProfile } = useAuthStore();
+  const { saveTokens, getProfile } = useAuthStore();
 
-  const handleLogin = async (): Promise<void> => {
-    if (!id || !password || isLoading) return;
+  const togglePasswordVisibility = useCallback(() => {
+    setIsPasswordVisible((prev) => !prev);
+  }, []);
+
+  const handleLogin = useCallback(async (): Promise<void> => {
+    if (!id.trim() || !password || isLoading) return;
 
     Keyboard.dismiss();
     setIsLoading(true);
@@ -41,8 +47,9 @@ export default function LoginScreen(): React.ReactElement {
         id,
         password,
       });
-      await setTokens(response.data);
-      await fetchUserProfile();
+
+      await saveTokens(response.data);
+      await getProfile();
       router.replace("/(tabs)");
     } catch (err) {
       const errorMessage =
@@ -53,13 +60,26 @@ export default function LoginScreen(): React.ReactElement {
       Toast.show({
         type: "error",
         text1: errorMessage,
+        position: Platform.OS === "ios" ? "top" : "bottom",
       });
 
-      console.error(JSON.stringify(err));
+      console.error("Login error:", err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, password, isLoading, saveTokens, getProfile]);
+
+  const handleIdSubmit = useCallback(() => {
+    passwordRef.current?.focus();
+  }, []);
+
+  const handleFocus = useCallback((input: string) => {
+    setFocusedInput(input);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setFocusedInput("");
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -96,33 +116,52 @@ export default function LoginScreen(): React.ReactElement {
                   placeholderTextColor={COLORS.gray400}
                   value={id}
                   onChangeText={setId}
-                  onFocus={() => setFocusedInput("id")}
-                  onBlur={() => setFocusedInput("")}
+                  onFocus={() => handleFocus("id")}
+                  onBlur={handleBlur}
                   autoCapitalize="none"
                   returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  onSubmitEditing={handleIdSubmit}
                   blurOnSubmit={false}
                   autoCorrect={false}
+                  keyboardType="default"
+                  textContentType="username"
                 />
               </View>
 
               <View style={styles.inputWrapper}>
-                <TextInput
-                  ref={passwordRef}
-                  style={[
-                    styles.input,
-                    focusedInput === "password" && styles.inputFocused,
-                  ]}
-                  placeholder="비밀번호"
-                  placeholderTextColor={COLORS.gray400}
-                  value={password}
-                  onChangeText={setPassword}
-                  onFocus={() => setFocusedInput("password")}
-                  onBlur={() => setFocusedInput("")}
-                  secureTextEntry
-                  returnKeyType="done"
-                  onSubmitEditing={handleLogin}
-                />
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    ref={passwordRef}
+                    style={[
+                      styles.passwordInput,
+                      focusedInput === "password" && styles.inputFocused,
+                    ]}
+                    placeholder="비밀번호"
+                    placeholderTextColor={COLORS.gray400}
+                    value={password}
+                    onChangeText={setPassword}
+                    onFocus={() => handleFocus("password")}
+                    onBlur={handleBlur}
+                    secureTextEntry={!isPasswordVisible}
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
+                    textContentType="password"
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    style={styles.visibilityToggle}
+                    onPress={togglePasswordVisibility}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={
+                        isPasswordVisible ? "eye-off-outline" : "eye-outline"
+                      }
+                      size={22}
+                      color={COLORS.gray500}
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
 
@@ -130,10 +169,10 @@ export default function LoginScreen(): React.ReactElement {
               <TouchableOpacity
                 style={[
                   styles.loginButton,
-                  (!id || !password) && styles.loginButtonDisabled,
+                  (!id.trim() || !password) && styles.loginButtonDisabled,
                 ]}
                 onPress={handleLogin}
-                disabled={!id || !password || isLoading}
+                disabled={!id.trim() || !password || isLoading}
                 activeOpacity={0.7}
               >
                 {isLoading ? (
@@ -203,8 +242,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.text,
   },
-  inputFocused: {
+  passwordContainer: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.gray100,
+    borderRadius: 8,
+    height: 52,
+  },
+  passwordInput: {
+    flex: 1,
+    height: "100%",
+    paddingHorizontal: 16,
+    fontSize: 15,
+    color: COLORS.text,
+    borderRadius: 8,
+  },
+  visibilityToggle: {
+    paddingHorizontal: 16,
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  inputFocused: {
     borderWidth: 1,
     borderColor: COLORS.primary600,
   },

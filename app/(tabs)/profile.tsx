@@ -1,12 +1,15 @@
-import React from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Text,
   View,
   StyleSheet,
-  TouchableOpacity,
   Image,
-  Alert,
+  TouchableOpacity,
+  StatusBar,
+  Modal,
+  Pressable,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthStore } from "@/stores/auth";
@@ -14,54 +17,94 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { COLORS } from "@/constants/colors";
 
+export interface User {
+  id: number;
+  dodamId: string;
+  grade?: number;
+  room?: number;
+  number?: number;
+  name: string;
+  profileImage: string;
+  role: "STUDENT" | "TEACHER";
+}
+
+const BACKGROUND_COLOR = "#F5F6F8";
+
 export default function ProfileScreen() {
-  const { user, logout } = useAuthStore();
+  const { user, signOut } = useAuthStore();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  if (!user) {
-    router.replace("/");
-    return null;
-  }
+  useEffect(() => {
+    if (!user && !isRedirecting) {
+      setIsRedirecting(true);
+      router.replace("/(auth)/login");
+    }
+  }, [user, isRedirecting]);
 
-  const handleLogout = async () => {
-    Alert.alert("로그아웃", "정말 로그아웃 하시겠습니까?", [
-      {
-        text: "취소",
-        style: "cancel",
-      },
-      {
-        text: "로그아웃",
-        onPress: async () => {
-          await logout();
-          router.replace("/");
-        },
-        style: "destructive",
-      },
-    ]);
-  };
+  const handleLogout = useCallback(async () => {
+    setShowLogoutDialog(false);
+    try {
+      await signOut();
+      router.replace("/(auth)/login");
+    } catch (error) {
+      console.error("로그아웃 중 오류 발생:", error);
+    }
+  }, [signOut]);
 
-  const formatStudentInfo = () => {
+  const toggleLogoutDialog = useCallback((visible: boolean) => {
+    setShowLogoutDialog(visible);
+  }, []);
+
+  const formatStudentInfo = useCallback(() => {
+    if (!user) return null;
     if (user.grade && user.room && user.number) {
       return `${user.grade}학년 ${user.room}반 ${user.number}번`;
     }
     return null;
-  };
+  }, [user]);
+
+  const studentInfo = formatStudentInfo();
+
+  if (!user) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <ActivityIndicator size="large" color={COLORS.primary500} />
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="chevron-back" size={24} color={COLORS.text} />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>프로필</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity
+          style={styles.settingsButton}
+          // onPress={() => router.push("/settings")}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="settings-outline" size={22} color={COLORS.text} />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        <View style={styles.profileSection}>
-          <View style={styles.profileImageContainer}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.7}
+          // onPress={() => router.push("/profile-edit")}
+        >
+          <View style={styles.profileContainer}>
             {user.profileImage ? (
               <Image
                 source={{ uri: user.profileImage }}
@@ -69,96 +112,120 @@ export default function ProfileScreen() {
               />
             ) : (
               <View style={styles.profileImagePlaceholder}>
-                <Ionicons name="person" size={40} color={COLORS.gray400} />
+                <Ionicons name="person" size={36} color={COLORS.gray400} />
               </View>
             )}
-          </View>
 
-          <Text style={styles.username}>{user.name}</Text>
-          {formatStudentInfo() && (
-            <Text style={styles.studentInfo}>{formatStudentInfo()}</Text>
-          )}
-          <Text style={styles.email}>{user.email}</Text>
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>
-              {user.role === "ADMIN" ? "관리자" : "사용자"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>계정</Text>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconContainer}>
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color={COLORS.primary600}
-              />
+            <View style={styles.profileInfo}>
+              <View style={styles.nameContainer}>
+                <Text style={styles.username}>{user.name}</Text>
+                <View style={styles.roleBadge}>
+                  <Text style={styles.roleText}>
+                    {user.role === "TEACHER" ? "선생님" : "학생"}
+                  </Text>
+                </View>
+              </View>
+              {studentInfo && (
+                <Text style={styles.studentInfo}>{studentInfo}</Text>
+              )}
             </View>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>계정 관리</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.7}
+            // onPress={() => router.push("/account-info")}
+          >
             <Text style={styles.menuText}>계정 정보</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.gray400} />
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconContainer}>
-              <Ionicons
-                name="notifications-outline"
-                size={20}
-                color={COLORS.primary600}
-              />
-            </View>
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.7}
+            // onPress={() => router.push("/notification-settings")}
+          >
             <Text style={styles.menuText}>알림 설정</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.gray400} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconContainer}>
-              <Ionicons
-                name="shield-outline"
-                size={20}
-                color={COLORS.primary600}
-              />
-            </View>
-            <Text style={styles.menuText}>개인정보 보호</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.gray400} />
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>지원</Text>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>지원</Text>
+          </View>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconContainer}>
-              <Ionicons
-                name="help-circle-outline"
-                size={20}
-                color={COLORS.primary600}
-              />
-            </View>
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.7}
+            // onPress={() => router.push("/help")}
+          >
             <Text style={styles.menuText}>도움말</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.gray400} />
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconContainer}>
-              <Ionicons
-                name="chatbubble-outline"
-                size={20}
-                color={COLORS.primary600}
-              />
-            </View>
-            <Text style={styles.menuText}>문의하기</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.gray400} />
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.7}
+            // onPress={() => router.push("/about")}
+          >
+            <Text style={styles.menuText}>서비스 정보</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color={COLORS.danger600} />
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={() => toggleLogoutDialog(true)}
+          activeOpacity={0.7}
+        >
           <Text style={styles.logoutText}>로그아웃</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={showLogoutDialog} transparent={true} animationType="fade">
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => toggleLogoutDialog(false)}
+        >
+          <View style={styles.dialogContainer}>
+            <Pressable
+              style={{ width: "100%" }}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.dialog}>
+                <Text style={styles.dialogTitle}>로그아웃</Text>
+                <Text style={styles.dialogMessage}>
+                  정말 로그아웃 하시겠습니까?
+                </Text>
+
+                <View style={styles.dialogActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => toggleLogoutDialog(false)}
+                  >
+                    <Text style={styles.cancelButtonText}>취소</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={handleLogout}
+                  >
+                    <Text style={styles.confirmButtonText}>로그아웃</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -166,129 +233,183 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.secondary50,
+    backgroundColor: BACKGROUND_COLOR,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray200,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
+    borderBottomColor: COLORS.gray100,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: COLORS.text,
   },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-  },
-  profileSection: {
-    backgroundColor: COLORS.white,
-    paddingVertical: 24,
+  settingsButton: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
     alignItems: "center",
   },
-  profileImageContainer: {
-    marginBottom: 16,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  profileContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
   },
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
   },
   profileImagePlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: COLORS.gray200,
     justifyContent: "center",
     alignItems: "center",
   },
+  profileInfo: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  nameContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
   username: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  studentInfo: {
-    fontSize: 15,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  email: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginBottom: 12,
-  },
-  roleBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: COLORS.primary50,
-    borderRadius: 12,
-  },
-  roleText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.primary600,
-  },
-  section: {
-    backgroundColor: COLORS.white,
-    marginTop: 12,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: COLORS.text,
-    marginBottom: 16,
+    marginRight: 8,
+  },
+  roleBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: COLORS.primary50,
+    borderRadius: 4,
+  },
+  roleText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.primary600,
+  },
+  studentInfo: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.text,
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
     paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray100,
-  },
-  menuIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.primary50,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
   },
   menuText: {
-    flex: 1,
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: "500",
     color: COLORS.text,
   },
   logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     backgroundColor: COLORS.white,
-    marginTop: 12,
-    marginBottom: 24,
-    padding: 16,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: "center",
   },
   logoutText: {
-    marginLeft: 8,
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
     color: COLORS.danger600,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dialogContainer: {
+    width: "80%",
+    maxWidth: 320,
+  },
+  dialog: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+  },
+  dialogTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  dialogMessage: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  dialogActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderRadius: 8,
+    marginRight: 8,
+    backgroundColor: COLORS.gray100,
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderRadius: 8,
+    marginLeft: 8,
+    backgroundColor: COLORS.danger500,
+  },
+  confirmButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.white,
   },
 });
