@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  StatusBar,
   ScrollView,
   Modal,
   Animated,
@@ -24,6 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/colors";
 import { usePaymentStore } from "@/stores/payment";
 import api from "@/libs/api";
+import { StatusBar } from "expo-status-bar";
 
 const BACKGROUND_COLOR = "#F5F6F8";
 const SLIDER_THUMB_SIZE = 52;
@@ -218,7 +218,12 @@ export default function PaymentScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+        <StatusBar
+          style="dark"
+          backgroundColor={COLORS.white}
+          animated
+          key="payment-status-bar"
+        />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary600} />
           <Text style={styles.loadingText}>결제 정보를 불러오는 중...</Text>
@@ -230,7 +235,13 @@ export default function PaymentScreen() {
   if (error || !order || !paymentRequest) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+        <StatusBar
+          style="dark"
+          backgroundColor={COLORS.white}
+          animated
+          key="payment-status-bar"
+        />
+
         <View style={styles.errorContainer}>
           <Ionicons
             name="alert-circle-outline"
@@ -254,7 +265,12 @@ export default function PaymentScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+      <StatusBar
+        style="dark"
+        backgroundColor={COLORS.white}
+        animated
+        key="payment-status-bar"
+      />
 
       <View style={styles.header}>
         <TouchableOpacity

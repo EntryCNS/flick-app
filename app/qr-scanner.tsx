@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  StatusBar,
   Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,6 +16,7 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
+import { StatusBar } from "expo-status-bar";
 
 export default function QRScannerScreen() {
   const [scanned, setScanned] = useState(false);
@@ -46,7 +46,6 @@ export default function QRScannerScreen() {
   const handleBarCodeScanned = ({ data }: BarcodeScanningResult) => {
     if (scanned) return;
     setScanned(true);
-
     router.push({
       pathname: "/payment",
       params: { token: data },
@@ -56,7 +55,7 @@ export default function QRScannerScreen() {
   if (!permission) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+        <StatusBar style="dark" backgroundColor={COLORS.white} animated />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary500} />
           <Text style={styles.loadingText}>
@@ -70,7 +69,7 @@ export default function QRScannerScreen() {
   if (!permission.granted) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+        <StatusBar style="dark" backgroundColor={COLORS.white} animated />
         <View style={styles.permissionContainer}>
           <Text style={styles.title}>
             결제 QR 코드 스캔을 위해{"\n"}카메라 접근 권한이 필요합니다
@@ -90,19 +89,25 @@ export default function QRScannerScreen() {
   return (
     <View style={styles.container}>
       <StatusBar
-        barStyle="light-content"
+        style="light"
         backgroundColor="transparent"
         translucent
+        animated
       />
-      <CameraView
-        style={styles.camera}
-        facing="back"
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: ["qr"],
-        }}
-      >
-        <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
+      <View style={styles.cameraContainer}>
+        <CameraView
+          style={styles.camera}
+          facing="back"
+          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr"],
+          }}
+        />
+
+        <SafeAreaView
+          style={styles.scanAreaContainer}
+          edges={["top", "bottom"]}
+        >
           <View style={styles.headerContainer}>
             <TouchableOpacity
               style={styles.backButton}
@@ -113,61 +118,59 @@ export default function QRScannerScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.scanAreaContainer}>
-            <View style={styles.scanFrame}>
-              <Animated.View
-                style={[
-                  styles.corner,
-                  styles.topLeft,
-                  {
-                    borderColor: COLORS.primary500,
-                    opacity: scanAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.7, 1],
-                    }),
-                  },
-                ]}
-              />
-              <Animated.View
-                style={[
-                  styles.corner,
-                  styles.topRight,
-                  {
-                    borderColor: COLORS.primary500,
-                    opacity: scanAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.7, 1],
-                    }),
-                  },
-                ]}
-              />
-              <Animated.View
-                style={[
-                  styles.corner,
-                  styles.bottomLeft,
-                  {
-                    borderColor: COLORS.primary500,
-                    opacity: scanAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.7, 1],
-                    }),
-                  },
-                ]}
-              />
-              <Animated.View
-                style={[
-                  styles.corner,
-                  styles.bottomRight,
-                  {
-                    borderColor: COLORS.primary500,
-                    opacity: scanAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.7, 1],
-                    }),
-                  },
-                ]}
-              />
-            </View>
+          <View style={styles.scanFrame}>
+            <Animated.View
+              style={[
+                styles.corner,
+                styles.topLeft,
+                {
+                  borderColor: COLORS.primary500,
+                  opacity: scanAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.7, 1],
+                  }),
+                },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.corner,
+                styles.topRight,
+                {
+                  borderColor: COLORS.primary500,
+                  opacity: scanAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.7, 1],
+                  }),
+                },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.corner,
+                styles.bottomLeft,
+                {
+                  borderColor: COLORS.primary500,
+                  opacity: scanAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.7, 1],
+                  }),
+                },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.corner,
+                styles.bottomRight,
+                {
+                  borderColor: COLORS.primary500,
+                  opacity: scanAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.7, 1],
+                  }),
+                },
+              ]}
+            />
           </View>
 
           <View style={styles.bottomContainer}>
@@ -186,7 +189,7 @@ export default function QRScannerScreen() {
             )}
           </View>
         </SafeAreaView>
-      </CameraView>
+      </View>
     </View>
   );
 }
@@ -236,12 +239,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.white,
   },
-  camera: {
+  cameraContainer: {
     flex: 1,
   },
-  overlay: {
+  camera: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  scanAreaContainer: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "space-between",
   },
   headerContainer: {
     flexDirection: "row",
@@ -257,14 +263,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  scanAreaContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   scanFrame: {
     width: 260,
     height: 260,
+    alignSelf: "center",
     position: "relative",
   },
   corner: {

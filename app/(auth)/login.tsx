@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,8 +10,7 @@ import {
   Image,
   Keyboard,
   Platform,
-  StatusBar,
-  KeyboardAvoidingView,
+  ScrollView,
   TouchableWithoutFeedback,
 } from "react-native";
 import { router } from "expo-router";
@@ -21,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { COLORS } from "@/constants/colors";
 import { API_URL } from "@/constants/api";
+import { StatusBar } from "expo-status-bar";
 
 export default function LoginScreen(): React.ReactElement {
   const [id, setId] = useState<string>("");
@@ -81,20 +81,45 @@ export default function LoginScreen(): React.ReactElement {
     setFocusedInput("");
   }, []);
 
+  const idInputStyle = useMemo(
+    () => [styles.input, focusedInput === "id" && styles.inputFocused],
+    [focusedInput]
+  );
+
+  const passwordInputStyle = useMemo(
+    () => [
+      styles.passwordInput,
+      focusedInput === "password" && styles.inputFocused,
+    ],
+    [focusedInput]
+  );
+
+  const loginButtonStyle = useMemo(
+    () => [
+      styles.loginButton,
+      (!id.trim() || !password) && styles.loginButtonDisabled,
+    ],
+    [id, password]
+  );
+
+  const eyeIconName = useMemo(
+    () => (isPasswordVisible ? "eye-off-outline" : "eye-outline"),
+    [isPasswordVisible]
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+      <StatusBar style="dark" />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 20 : 0}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.content}>
             <View style={styles.logoSection}>
               <Image
-                source={require("@/assets/logo.png")}
+                source={require("@/assets/images/logo.png")}
                 style={styles.logo}
                 resizeMode="contain"
               />
@@ -108,10 +133,7 @@ export default function LoginScreen(): React.ReactElement {
             <View style={styles.formSection}>
               <View style={styles.inputWrapper}>
                 <TextInput
-                  style={[
-                    styles.input,
-                    focusedInput === "id" && styles.inputFocused,
-                  ]}
+                  style={idInputStyle}
                   placeholder="아이디"
                   placeholderTextColor={COLORS.gray400}
                   value={id}
@@ -132,10 +154,7 @@ export default function LoginScreen(): React.ReactElement {
                 <View style={styles.passwordContainer}>
                   <TextInput
                     ref={passwordRef}
-                    style={[
-                      styles.passwordInput,
-                      focusedInput === "password" && styles.inputFocused,
-                    ]}
+                    style={passwordInputStyle}
                     placeholder="비밀번호"
                     placeholderTextColor={COLORS.gray400}
                     value={password}
@@ -154,9 +173,7 @@ export default function LoginScreen(): React.ReactElement {
                     activeOpacity={0.7}
                   >
                     <Ionicons
-                      name={
-                        isPasswordVisible ? "eye-off-outline" : "eye-outline"
-                      }
+                      name={eyeIconName}
                       size={22}
                       color={COLORS.gray500}
                     />
@@ -167,10 +184,7 @@ export default function LoginScreen(): React.ReactElement {
 
             <View style={styles.buttonSection}>
               <TouchableOpacity
-                style={[
-                  styles.loginButton,
-                  (!id.trim() || !password) && styles.loginButtonDisabled,
-                ]}
+                style={loginButtonStyle}
                 onPress={handleLogin}
                 disabled={!id.trim() || !password || isLoading}
                 activeOpacity={0.7}
@@ -184,7 +198,7 @@ export default function LoginScreen(): React.ReactElement {
             </View>
           </View>
         </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -194,8 +208,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
-  keyboardView: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
   },
   content: {
     flex: 1,
@@ -206,6 +220,7 @@ const styles = StyleSheet.create({
   logoSection: {
     alignItems: "center",
     marginBottom: 40,
+    marginTop: 40,
   },
   logo: {
     width: 64,

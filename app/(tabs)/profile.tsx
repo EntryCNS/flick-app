@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
-  StatusBar,
   Modal,
   Pressable,
   ScrollView,
@@ -16,6 +15,7 @@ import { useAuthStore } from "@/stores/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { COLORS } from "@/constants/colors";
+import { StatusBar } from "expo-status-bar";
 
 export interface User {
   id: number;
@@ -37,6 +37,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!user && !isRedirecting) {
+      signOut();
       setIsRedirecting(true);
       router.replace("/(auth)/login");
     }
@@ -68,127 +69,133 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <View
-        style={[
-          styles.container,
-          { justifyContent: "center", alignItems: "center" },
-        ]}
-      >
+      <SafeAreaView style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={COLORS.primary500} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+    <View style={styles.container}>
+      <StatusBar
+        style="dark"
+        backgroundColor={COLORS.white}
+        animated
+        key="profile-status-bar"
+      />
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>프로필</Text>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          // onPress={() => router.push("/settings")}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="settings-outline" size={22} color={COLORS.text} />
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.headerArea} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>프로필</Text>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="settings-outline" size={22} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity
-          style={styles.card}
-          activeOpacity={0.7}
-          // onPress={() => router.push("/profile-edit")}
-        >
-          <View style={styles.profileContainer}>
-            {user.profileImage ? (
-              <Image
-                source={{ uri: user.profileImage }}
-                style={styles.profileImage}
-              />
-            ) : (
-              <View style={styles.profileImagePlaceholder}>
-                <Ionicons name="person" size={36} color={COLORS.gray400} />
-              </View>
-            )}
+      <View style={styles.contentWrapper}>
+        <View style={styles.bgExtender} />
+        <View style={styles.contentContainer}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <TouchableOpacity style={styles.card} activeOpacity={0.7}>
+              <View style={styles.profileContainer}>
+                {user.profileImage ? (
+                  <Image
+                    source={{ uri: user.profileImage }}
+                    style={styles.profileImage}
+                  />
+                ) : (
+                  <View style={styles.profileImagePlaceholder}>
+                    <Ionicons name="person" size={36} color={COLORS.gray400} />
+                  </View>
+                )}
 
-            <View style={styles.profileInfo}>
-              <View style={styles.nameContainer}>
-                <Text style={styles.username}>{user.name}</Text>
-                <View style={styles.roleBadge}>
-                  <Text style={styles.roleText}>
-                    {user.role === "TEACHER" ? "선생님" : "학생"}
-                  </Text>
+                <View style={styles.profileInfo}>
+                  <View style={styles.nameContainer}>
+                    <Text style={styles.username}>{user.name}</Text>
+                    <View style={styles.roleBadge}>
+                      <Text style={styles.roleText}>
+                        {user.role === "TEACHER" ? "선생님" : "학생"}
+                      </Text>
+                    </View>
+                  </View>
+                  {studentInfo && (
+                    <Text style={styles.studentInfo}>{studentInfo}</Text>
+                  )}
                 </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.gray500}
+                />
               </View>
-              {studentInfo && (
-                <Text style={styles.studentInfo}>{studentInfo}</Text>
-              )}
+            </TouchableOpacity>
+
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>계정 관리</Text>
+              </View>
+
+              <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+                <Text style={styles.menuText}>계정 정보</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.gray500}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+                <Text style={styles.menuText}>알림 설정</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.gray500}
+                />
+              </TouchableOpacity>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
-          </View>
-        </TouchableOpacity>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>계정 관리</Text>
-          </View>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>지원</Text>
+              </View>
 
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            // onPress={() => router.push("/account-info")}
-          >
-            <Text style={styles.menuText}>계정 정보</Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
-          </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+                <Text style={styles.menuText}>도움말</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.gray500}
+                />
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            // onPress={() => router.push("/notification-settings")}
-          >
-            <Text style={styles.menuText}>알림 설정</Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
-          </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+                <Text style={styles.menuText}>서비스 정보</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.gray500}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={() => toggleLogoutDialog(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.logoutText}>로그아웃</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
-
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>지원</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            // onPress={() => router.push("/help")}
-          >
-            <Text style={styles.menuText}>도움말</Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            // onPress={() => router.push("/about")}
-          >
-            <Text style={styles.menuText}>서비스 정보</Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={() => toggleLogoutDialog(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.logoutText}>로그아웃</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      </View>
 
       <Modal visible={showLogoutDialog} transparent={true} animationType="fade">
         <Pressable
@@ -226,14 +233,22 @@ export default function ProfileScreen() {
           </View>
         </Pressable>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BACKGROUND_COLOR,
+    backgroundColor: COLORS.white,
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerArea: {
+    backgroundColor: COLORS.white,
+    zIndex: 2,
   },
   header: {
     flexDirection: "row",
@@ -241,9 +256,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
+    backgroundColor: COLORS.white,
   },
   headerTitle: {
     fontSize: 18,
@@ -255,6 +270,24 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     alignItems: "center",
+  },
+  contentWrapper: {
+    flex: 1,
+    position: "relative",
+  },
+  bgExtender: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: -1000,
+    height: 1000,
+    backgroundColor: BACKGROUND_COLOR,
+    zIndex: 0,
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: BACKGROUND_COLOR,
+    zIndex: 1,
   },
   scrollView: {
     flex: 1,

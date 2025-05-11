@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  StatusBar,
   ListRenderItem,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import api from "@/libs/api";
 import { COLORS } from "@/constants/colors";
+import { StatusBar } from "expo-status-bar";
 
 interface Transaction {
   id: number;
@@ -221,7 +221,7 @@ export default function TransactionsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+      <StatusBar style="dark" backgroundColor={COLORS.white} />
 
       <View style={styles.header}>
         <TouchableOpacity

@@ -18,6 +18,8 @@ api.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  console.log(`Request: ${config.url}`);
+
   return config;
 });
 

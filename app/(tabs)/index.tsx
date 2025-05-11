@@ -1,21 +1,21 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, memo } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  StatusBar,
   TouchableOpacity,
   Animated,
   RefreshControl,
   Image,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import api from "@/libs/api";
 import { COLORS } from "@/constants/colors";
-import { Stack } from "expo-router";
 import { useAuthStore } from "@/stores/auth";
+import { StatusBar } from "expo-status-bar";
+import { Skeleton } from "@/components/Skeleton";
 
 interface Transaction {
   id: number;
@@ -33,76 +33,111 @@ interface Transaction {
 
 interface TransactionItemProps {
   transaction: Transaction;
-  isLast: boolean;
   formatAmount: (amount: number, type: string) => string;
   formatTime: (dateTimeString: string) => string;
 }
 
+interface TransactionSkeletonProps {
+  index: number;
+}
+
 const BACKGROUND_COLOR = "#F5F6F8";
 
-const TransactionItem: React.FC<TransactionItemProps> = ({
-  transaction,
-  isLast,
-  formatAmount,
-  formatTime,
-}) => {
-  const isCharge = transaction.type === "CHARGE";
-
-  const formatDate = (dateString: string): string => {
-    const today = new Date();
-    const date = new Date(dateString);
-
-    if (today.toDateString() === date.toDateString()) {
-      return "오늘";
-    }
-
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (yesterday.toDateString() === date.toDateString()) {
-      return "어제";
-    }
-
-    return `${date.getMonth() + 1}월 ${date.getDate()}일`;
-  };
-
-  return (
-    <TouchableOpacity
-      style={styles.transactionItem}
-      activeOpacity={0.6}
-      onPress={() => router.push(`/transactions/${transaction.id}`)}
+const AccountSkeletonLoader = memo(() => (
+  <View style={styles.accountContainer}>
+    <View
+      style={[styles.accountLogoContainer, { backgroundColor: "transparent" }]}
     >
-      <View style={styles.transactionRow}>
-        <Text style={styles.transactionName} numberOfLines={1}>
-          {isCharge ? "포인트 충전" : transaction.product.name}
-        </Text>
-        <Text
-          style={[
-            styles.transactionAmount,
-            isCharge ? styles.amountPositive : styles.amountNegative,
-          ]}
-        >
-          {formatAmount(transaction.amount, transaction.type)}원
-        </Text>
-      </View>
+      <Skeleton width={40} height={40} borderRadius={20} />
+    </View>
+    <View style={styles.accountDetails}>
+      <Skeleton width={80} height={14} style={{ marginBottom: 8 }} />
+      <Skeleton width={140} height={22} />
+    </View>
+  </View>
+));
 
-      <View style={styles.transactionMetaRow}>
-        <Text style={styles.transactionDate}>
-          {formatDate(transaction.createdAt)}{" "}
-          {formatTime(transaction.createdAt)}
-        </Text>
-        <Text style={styles.transactionPlace} numberOfLines={1}>
-          {isCharge ? transaction.memo || "" : transaction.booth.name}
-        </Text>
+const TransactionSkeletonLoader = memo(
+  ({ index }: TransactionSkeletonProps) => {
+    const nameWidth = [160, 140, 150][index % 3] as number;
+    const amountWidth = [80, 70, 75][index % 3] as number;
+    const dateWidth = [70, 65, 75][index % 3] as number;
+    const placeWidth = [90, 110, 100][index % 3] as number;
+
+    return (
+      <View style={styles.transactionItem}>
+        <View style={styles.transactionRow}>
+          <Skeleton width={nameWidth} height={16} style={{ marginRight: 8 }} />
+          <Skeleton width={amountWidth} height={16} />
+        </View>
+        <View style={[styles.transactionMetaRow, { marginTop: 8 }]}>
+          <Skeleton width={dateWidth} height={12} />
+          <Skeleton width={placeWidth} height={12} />
+        </View>
       </View>
-    </TouchableOpacity>
-  );
-};
+    );
+  }
+);
+
+const TransactionItem = memo(
+  ({ transaction, formatAmount, formatTime }: TransactionItemProps) => {
+    const isCharge = transaction.type === "CHARGE";
+
+    const formatDate = (dateString: string): string => {
+      const today = new Date();
+      const date = new Date(dateString);
+
+      if (today.toDateString() === date.toDateString()) {
+        return "오늘";
+      }
+
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      if (yesterday.toDateString() === date.toDateString()) {
+        return "어제";
+      }
+
+      return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+    };
+
+    return (
+      <TouchableOpacity
+        style={styles.transactionItem}
+        activeOpacity={0.6}
+        onPress={() => router.push(`/transactions/${transaction.id}`)}
+      >
+        <View style={styles.transactionRow}>
+          <Text style={styles.transactionName} numberOfLines={1}>
+            {isCharge ? "포인트 충전" : transaction.product.name}
+          </Text>
+          <Text
+            style={[
+              styles.transactionAmount,
+              isCharge ? styles.amountPositive : styles.amountNegative,
+            ]}
+          >
+            {formatAmount(transaction.amount, transaction.type)}원
+          </Text>
+        </View>
+
+        <View style={styles.transactionMetaRow}>
+          <Text style={styles.transactionDate}>
+            {formatDate(transaction.createdAt)}{" "}
+            {formatTime(transaction.createdAt)}
+          </Text>
+          <Text style={styles.transactionPlace} numberOfLines={1}>
+            {isCharge ? transaction.memo || "" : transaction.booth.name}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+);
 
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const [balance, setBalance] = useState(0);
+  const [balance, setBalance] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -148,8 +183,8 @@ export default function HomeScreen() {
       }).start();
 
       const [balanceResponse, transactionsResponse] = await Promise.all([
-        api.get("/users/me/balance"),
-        api.get("/transactions/my"),
+        api.get<number>("/users/me/balance"),
+        api.get<Transaction[]>("/transactions/my"),
       ]);
 
       setBalance(balanceResponse.data);
@@ -176,69 +211,63 @@ export default function HomeScreen() {
     }
   }, [user, fetchData]);
 
-  // If there's no user, we should render a loading state or redirect
-  if (!user) {
-    return (
-      <View
-        style={[
-          styles.container,
-          { justifyContent: "center", alignItems: "center" },
-        ]}
-      >
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
+  const renderTransactionSkeletons = () => (
+    <>
+      {[0, 1, 2].map((index) => (
+        <TransactionSkeletonLoader key={`skeleton-${index}`} index={index} />
+      ))}
+    </>
+  );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={BACKGROUND_COLOR}
-        translucent
-      />
+    <View style={styles.container}>
+      <StatusBar animated style="light" backgroundColor={BACKGROUND_COLOR} />
 
-      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <Animated.View
+          style={[styles.header, { backgroundColor: headerBackgroundColor }]}
+        >
+          <Text style={styles.logoText}>
+            <Text style={styles.highlightText}>F</Text>lick
+          </Text>
 
-      <Animated.View
-        style={[styles.header, { backgroundColor: headerBackgroundColor }]}
-      >
-        <Text style={styles.logoText}>
-          <Text style={styles.highlightText}>F</Text>lick
-        </Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={handleRefresh}
+              disabled={refreshing || loading}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                <Ionicons
+                  name="refresh-outline"
+                  size={18}
+                  color={
+                    refreshing || loading ? COLORS.primary500 : COLORS.text
+                  }
+                />
+              </Animated.View>
+            </TouchableOpacity>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={handleRefresh}
-            disabled={refreshing}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Animated.View style={{ transform: [{ rotate: spin }] }}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => router.push("/notifications")}
+              disabled={loading && !user}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Ionicons
-                name="refresh-outline"
+                name="notifications-outline"
                 size={18}
-                color={refreshing ? COLORS.primary500 : COLORS.text}
+                color={COLORS.text}
               />
-            </Animated.View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => router.push("/notifications")}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={18}
-              color={COLORS.text}
-            />
-            <View style={styles.notificationBadge} />
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
+              {!loading && user && <View style={styles.notificationBadge} />}
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </SafeAreaView>
 
       <Animated.ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -257,10 +286,13 @@ export default function HomeScreen() {
         )}
         scrollEventThrottle={16}
       >
+        <View style={styles.extender} />
+
         <TouchableOpacity
           style={styles.card}
           activeOpacity={0.7}
           onPress={() => router.push("/qr-scanner")}
+          disabled={loading && !user}
         >
           <View style={styles.cardInner}>
             <Text style={styles.cardTitle}>결제하기</Text>
@@ -268,45 +300,45 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.card}
-          activeOpacity={0.7}
-          // onPress={() => router.push("/accounts")}
-        >
+        <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>계좌</Text>
             <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
           </View>
 
-          <TouchableOpacity
-            style={styles.accountContainer}
-            activeOpacity={0.7}
-            // onPress={() => router.push(`/accounts`)}
-          >
-            <View style={styles.accountLogoContainer}>
-              <Image
-                source={require("@/assets/images/logo.png")}
-                style={styles.accountLogo}
-                resizeMode="contain"
-              />
-            </View>
-
-            <View style={styles.accountDetails}>
-              <Text style={styles.accountName}>{user.name}님의 통장</Text>
-              <View style={styles.balanceRow}>
-                <Text style={styles.accountBalance}>
-                  {balance.toLocaleString()}
-                </Text>
-                <Text style={styles.wonText}>원</Text>
+          {loading || !user || balance === null ? (
+            <AccountSkeletonLoader />
+          ) : (
+            <TouchableOpacity
+              style={styles.accountContainer}
+              activeOpacity={0.7}
+            >
+              <View style={styles.accountLogoContainer}>
+                <Image
+                  source={require("@/assets/images/logo.png")}
+                  style={styles.accountLogo}
+                  resizeMode="contain"
+                />
               </View>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+
+              <View style={styles.accountDetails}>
+                <Text style={styles.accountName}>{user.name}님의 통장</Text>
+                <View style={styles.balanceRow}>
+                  <Text style={styles.accountBalance}>
+                    {balance.toLocaleString()}
+                  </Text>
+                  <Text style={styles.wonText}>원</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
 
         <TouchableOpacity
           style={styles.card}
           activeOpacity={0.7}
-          onPress={() => router.push("/transactions")}
+          onPress={() => user && router.push("/transactions")}
+          disabled={loading && !user}
         >
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>결제 내역</Text>
@@ -314,16 +346,9 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.transactionsList}>
-            {loading ? (
-              <View style={styles.emptyContainer}>
-                <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                  <Ionicons
-                    name="refresh-outline"
-                    size={22}
-                    color={COLORS.gray300}
-                  />
-                </Animated.View>
-                <Text style={styles.emptyText}>내역을 불러오는 중...</Text>
+            {loading || !user ? (
+              <View style={styles.transactionsContent}>
+                {renderTransactionSkeletons()}
               </View>
             ) : transactions.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -340,7 +365,6 @@ export default function HomeScreen() {
                   <TransactionItem
                     key={transaction.id}
                     transaction={transaction}
-                    isLast={index === Math.min(2, transactions.length - 1)}
                     formatAmount={formatAmount}
                     formatTime={formatTime}
                   />
@@ -359,6 +383,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BACKGROUND_COLOR,
   },
+  safeArea: {
+    backgroundColor: BACKGROUND_COLOR,
+    zIndex: 2,
+  },
+  extender: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: -1000,
+    height: 1000,
+    backgroundColor: BACKGROUND_COLOR,
+    zIndex: -1,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -367,6 +404,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
+    zIndex: 1,
   },
   logoText: {
     fontSize: 22,
@@ -397,6 +435,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: COLORS.danger500,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
     paddingHorizontal: 14,
     paddingTop: 14,
@@ -407,6 +448,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: 16,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   cardInner: {
     flexDirection: "row",

@@ -8,61 +8,112 @@
     "scheme": "flick",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
-      "dark": {
-        "backgroundColor": "#0f1116"
-      }
-    },
+    "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.flick.core",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["fetch", "remote-notification"],
+        "NSCameraUsageDescription": "이 앱은 QR 코드 스캔을 위해 카메라 접근 권한이 필요합니다",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSExceptionDomains": {
+          "flickapi.proxia.kr": {
+            "NSIncludesSubdomains": true,
+            "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+            "NSExceptionAllowsInsecureHTTPLoads": true,
+            "NSExceptionMinimumTLSVersion": "TLSv1.2"
+          },
+          "proxia.kr": {
+            "NSIncludesSubdomains": true,
+            "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+            "NSExceptionAllowsInsecureHTTPLoads": true,
+            "NSExceptionMinimumTLSVersion": "TLSv1.2"
+          }
+        },
+        "LSApplicationQueriesSchemes": ["https", "http"],
+        "UIRequiresFullScreen": true,
+        "UIStatusBarHidden": true,
+        "UIStatusBarStyle": "UIStatusBarStyleDefault"
+      },
+      "requireFullScreen": true,
+      "buildNumber": "1.0.0"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo.png",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.flick.core"
+      "package": "com.flick.core",
+      "versionCode": 1,
+      "permissions": ["VIBRATE", "RECEIVE_BOOT_COMPLETED", "CAMERA"],
+      "softwareKeyboardLayoutMode": "pan",
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       [
-        "expo-sensors",
+        "expo-camera",
         {
-          "motionPermission": "Allow ${PRODUCT_NAME} to access your device motion"
+          "cameraPermission": "이 앱은 QR 코드 스캔을 위해 카메라 접근 권한이 필요합니다"
         }
       ],
       "expo-font",
-      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo.png",
+          "imageWidth": 200,
+          "backgroundColor": "#ffffff",
+          "imageResizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#0f1116"
+          }
+        }
+      ],
       [
         "expo-notifications",
         {
           "icon": "./assets/images/notification.png",
           "color": "#6366F1",
-          "enableBackgroundRemoteNotifications": false
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT"
         }
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "tsconfigPaths": true
     },
     "extra": {
-      "router": {},
+      "router": {
+        "origin": false
+      },
       "eas": {
         "projectId": "1d4f3888-6474-4e13-b335-08b1eaacc1a9"
       }
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "jsEngine": "hermes",
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

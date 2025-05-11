@@ -1,13 +1,11 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
-  StatusBar,
   ListRenderItem,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +13,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import api from "@/libs/api";
 import { COLORS } from "@/constants/colors";
+import { StatusBar } from "expo-status-bar";
+import { Skeleton } from "@/components/Skeleton";
 
 interface Notice {
   id: number;
@@ -23,6 +23,39 @@ interface Notice {
   isPinned: boolean;
   createdAt: string;
 }
+
+const BACKGROUND_COLOR = "#F5F6F8";
+
+const NoticeSkeletonLoader = memo(() => (
+  <View style={styles.card}>
+    <View style={styles.noticeHeader}>
+      <Skeleton width={80} height={12} style={{ alignSelf: "flex-end" }} />
+    </View>
+
+    <Skeleton width="95%" height={16} style={{ marginBottom: 6 }} />
+    <Skeleton width="60%" height={16} style={{ marginBottom: 12 }} />
+
+    <Skeleton width="90%" height={14} style={{ marginBottom: 4 }} />
+    <Skeleton width="85%" height={14} />
+  </View>
+));
+
+const PinnedNoticeSkeletonLoader = memo(() => (
+  <View style={[styles.card, styles.pinnedNotice]}>
+    <View style={styles.noticeHeader}>
+      <View style={styles.pinnedIcon}>
+        <Skeleton width={14} height={14} borderRadius={7} />
+      </View>
+      <Skeleton width={80} height={12} />
+    </View>
+
+    <Skeleton width="95%" height={16} style={{ marginBottom: 6 }} />
+    <Skeleton width="70%" height={16} style={{ marginBottom: 12 }} />
+
+    <Skeleton width="90%" height={14} style={{ marginBottom: 4 }} />
+    <Skeleton width="85%" height={14} />
+  </View>
+));
 
 export default function NoticesScreen() {
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -83,7 +116,7 @@ export default function NoticesScreen() {
     ({ item }) => {
       return (
         <TouchableOpacity
-          style={[styles.noticeItem, item.isPinned && styles.pinnedNotice]}
+          style={[styles.card, item.isPinned && styles.pinnedNotice]}
           activeOpacity={0.7}
           onPress={() => router.push(`/notices/${item.id}`)}
         >
@@ -124,6 +157,15 @@ export default function NoticesScreen() {
     );
   }, [loading]);
 
+  const renderSkeletonList = () => (
+    <View style={{ gap: 12 }}>
+      <PinnedNoticeSkeletonLoader />
+      <NoticeSkeletonLoader />
+      <NoticeSkeletonLoader />
+      <NoticeSkeletonLoader />
+    </View>
+  );
+
   const keyExtractor = useCallback((item: Notice) => item.id.toString(), []);
 
   const memoizedRefreshControl = useMemo(
@@ -139,30 +181,43 @@ export default function NoticesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+    <View style={styles.container}>
+      <StatusBar style="dark" backgroundColor={COLORS.white} animated />
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>공지사항</Text>
-      </View>
-
-      {loading && !refreshing ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary500} />
+      <SafeAreaView style={styles.headerArea} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>공지사항</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.settingsButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="filter-outline" size={22} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
         </View>
-      ) : (
-        <FlatList
-          data={notices}
-          renderItem={renderNoticeItem}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={memoizedRefreshControl}
-          ListEmptyComponent={renderEmpty}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-    </SafeAreaView>
+      </SafeAreaView>
+
+      <View style={styles.contentWrapper}>
+        <View style={styles.bgExtender} />
+        <View style={styles.contentContainer}>
+          {loading && !refreshing ? (
+            <View style={styles.scrollContent}>{renderSkeletonList()}</View>
+          ) : (
+            <FlatList
+              data={notices}
+              renderItem={renderNoticeItem}
+              keyExtractor={keyExtractor}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              refreshControl={memoizedRefreshControl}
+              ListEmptyComponent={renderEmpty}
+              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            />
+          )}
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -171,40 +226,75 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray100,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-  loadingContainer: {
-    flex: 1,
+  centered: {
     justifyContent: "center",
     alignItems: "center",
   },
-  listContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    flexGrow: 1,
-  },
-  noticeItem: {
-    padding: 16,
+  headerArea: {
     backgroundColor: COLORS.white,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.gray100,
-    marginBottom: 12,
+    zIndex: 2,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
+    backgroundColor: COLORS.white,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  settingsButton: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  contentWrapper: {
+    flex: 1,
+    position: "relative",
+  },
+  bgExtender: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: -1000,
+    height: 1000,
+    backgroundColor: BACKGROUND_COLOR,
+    zIndex: 0,
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: BACKGROUND_COLOR,
+    zIndex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    overflow: "hidden",
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   pinnedNotice: {
-    borderColor: COLORS.danger100,
     backgroundColor: COLORS.danger50,
   },
   noticeHeader: {
@@ -230,9 +320,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     lineHeight: 20,
-  },
-  separator: {
-    height: 8,
   },
   emptyContainer: {
     flex: 1,

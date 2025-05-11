@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
-  StatusBar,
   Image,
   Platform,
   ListRenderItem,
@@ -17,6 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { COLORS } from "@/constants/colors";
 import api from "@/libs/api";
+import { StatusBar } from "expo-status-bar";
+import { Skeleton } from "@/components/Skeleton";
 
 interface Booth {
   id: number;
@@ -27,12 +27,41 @@ interface Booth {
   category?: string;
 }
 
+const BACKGROUND_COLOR = COLORS.secondary50;
+
+const BoothSkeletonLoader = memo(() => (
+  <View style={styles.card}>
+    <View style={styles.boothImageContainer}>
+      <Skeleton width={100} height={100} borderRadius={0} />
+    </View>
+    <View style={styles.boothContent}>
+      <Skeleton width={140} height={16} style={{ marginBottom: 8 }} />
+
+      <Skeleton
+        width={70}
+        height={20}
+        style={{ marginBottom: 8, borderRadius: 4 }}
+      />
+
+      <Skeleton width="90%" height={12} style={{ marginBottom: 8 }} />
+      <Skeleton width="60%" height={12} style={{ marginBottom: 8 }} />
+
+      <View style={styles.locationContainer}>
+        <Skeleton width={10} height={10} style={{ borderRadius: 5 }} />
+        <Skeleton width={90} height={12} style={{ marginLeft: 4 }} />
+      </View>
+    </View>
+    <View style={styles.arrowContainer}>
+      <Ionicons name="chevron-forward" size={16} color={COLORS.gray300} />
+    </View>
+  </View>
+));
+
 export default function BoothsScreen() {
   const [booths, setBooths] = useState<Booth[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchBooths = useCallback(
     async (shouldRefresh = false): Promise<void> => {
@@ -68,20 +97,14 @@ export default function BoothsScreen() {
   const navigateToBoothDetail = useCallback((boothId: number) => {
     router.push({
       pathname: "/booths/[boothId]",
-      params: { boothId: boothId },
+      params: { boothId },
     });
   }, []);
-
-  const handleSearch = useCallback(() => {
-    if (searchQuery.trim()) {
-      alert(`'${searchQuery}' 검색 기능은 준비 중입니다.`);
-    }
-  }, [searchQuery]);
 
   const renderBoothCard: ListRenderItem<Booth> = useCallback(
     ({ item }) => (
       <TouchableOpacity
-        style={styles.boothCard}
+        style={styles.card}
         activeOpacity={0.7}
         onPress={() => navigateToBoothDetail(item.id)}
       >
@@ -130,7 +153,7 @@ export default function BoothsScreen() {
           )}
         </View>
         <View style={styles.arrowContainer}>
-          <Ionicons name="chevron-forward" size={18} color={COLORS.gray400} />
+          <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
         </View>
       </TouchableOpacity>
     ),
@@ -157,119 +180,149 @@ export default function BoothsScreen() {
     [error, fetchBooths]
   );
 
+  const renderSkeletonList = () => (
+    <FlatList
+      data={Array.from({ length: 5 }, (_, i) => i + 1)}
+      renderItem={() => <BoothSkeletonLoader />}
+      keyExtractor={(item) => `skeleton-${item}`}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    />
+  );
+
   const keyExtractor = useCallback((item: Booth) => item.id.toString(), []);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+    <View style={styles.container}>
+      <StatusBar animated style="dark" backgroundColor={COLORS.white} />
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>부스</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={handleSearch}
-            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-          >
-            <Ionicons name="search-outline" size={22} color={COLORS.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => router.push("/notifications")}
-            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={22}
-              color={COLORS.text}
+      <SafeAreaView style={styles.headerArea} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>부스</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.settingsButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="search-outline" size={22} color={COLORS.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.settingsButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={() => router.push("/notifications")}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={COLORS.text}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+
+      <View style={styles.contentWrapper}>
+        <View style={styles.bgExtender} />
+        <View style={styles.contentContainer}>
+          {loading && !refreshing ? (
+            renderSkeletonList()
+          ) : (
+            <FlatList
+              data={booths}
+              renderItem={renderBoothCard}
+              keyExtractor={keyExtractor}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={COLORS.primary500}
+                  colors={[COLORS.primary500]}
+                />
+              }
+              ListEmptyComponent={renderEmptyComponent}
+              initialNumToRender={8}
+              maxToRenderPerBatch={5}
+              windowSize={10}
+              removeClippedSubviews={Platform.OS === "android"}
             />
-          </TouchableOpacity>
+          )}
         </View>
       </View>
-
-      {loading && !refreshing ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary500} />
-        </View>
-      ) : (
-        <FlatList
-          data={booths}
-          renderItem={renderBoothCard}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={[
-            styles.listContainer,
-            booths.length === 0 && { flex: 1 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={COLORS.primary500}
-              colors={[COLORS.primary500]}
-            />
-          }
-          ListEmptyComponent={renderEmptyComponent}
-          initialNumToRender={8}
-          maxToRenderPerBatch={5}
-          windowSize={10}
-          removeClippedSubviews={Platform.OS === "android"}
-        />
-      )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.secondary50,
+    backgroundColor: COLORS.white,
+  },
+  headerArea: {
+    backgroundColor: COLORS.white,
+    zIndex: 2,
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
+    backgroundColor: COLORS.white,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "600",
     color: COLORS.text,
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 16,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.gray50,
-    alignItems: "center",
+  settingsButton: {
+    width: 32,
+    height: 32,
     justifyContent: "center",
-    marginLeft: 8,
+    alignItems: "center",
   },
-  loadingContainer: {
+  contentWrapper: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    position: "relative",
   },
-  listContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 24,
-    flexGrow: 1,
+  bgExtender: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: -1000,
+    height: 1000,
+    backgroundColor: BACKGROUND_COLOR,
+    zIndex: 0,
   },
-  boothCard: {
+  contentContainer: {
+    flex: 1,
+    backgroundColor: BACKGROUND_COLOR,
+    zIndex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  card: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    marginBottom: 16,
-    flexDirection: "row",
+    borderRadius: 16,
     overflow: "hidden",
+    flexDirection: "row",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   boothImageContainer: {
     width: 100,
@@ -281,7 +334,7 @@ const styles = StyleSheet.create({
     height: 100,
   },
   boothImagePlaceholder: {
-    backgroundColor: COLORS.gray100,
+    backgroundColor: COLORS.gray200,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -342,6 +395,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 16,
     textAlign: "center",
+    fontWeight: "500",
   },
   retryButton: {
     backgroundColor: COLORS.primary500,
