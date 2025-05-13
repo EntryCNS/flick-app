@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/auth";
-import { Redirect, Stack } from "expo-router";
+import { Stack } from "expo-router";
 import { View, ActivityIndicator } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { StatusBar } from "expo-status-bar";
@@ -8,7 +8,6 @@ import * as SplashScreen from "expo-splash-screen";
 
 export default function AuthLayout() {
   const [isLoading, setIsLoading] = useState(true);
-  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
   const checkAuth = useAuthStore((state) => state.checkAuth);
 
   useEffect(() => {
@@ -38,10 +37,6 @@ export default function AuthLayout() {
         <ActivityIndicator size="large" color={COLORS.primary500} />
       </View>
     );
-  }
-
-  if (isLoggedIn) {
-    return <Redirect href="/(tabs)" />;
   }
 
   return (

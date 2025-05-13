@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
   ListRenderItem,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +15,13 @@ import { router } from "expo-router";
 import api from "@/libs/api";
 import { COLORS } from "@/constants/colors";
 import { StatusBar } from "expo-status-bar";
+import { Skeleton } from "@/components/Skeleton";
+import dayjs from "dayjs";
+import "dayjs/locale/ko";
+import relativeTime from "dayjs/plugin/relativeTime";
+
+dayjs.extend(relativeTime);
+dayjs.locale("ko");
 
 interface Notification {
   id: number;
@@ -31,55 +38,35 @@ interface NotificationIcon {
   bg: string;
 }
 
+const NotificationSkeletonItem = memo(() => (
+  <View style={styles.notificationItem}>
+    <View
+      style={[styles.notificationIcon, { backgroundColor: COLORS.gray100 }]}
+    />
+
+    <View style={styles.notificationContent}>
+      <View style={styles.notificationHeader}>
+        <Skeleton width={140} height={15} />
+        <Skeleton width={50} height={12} />
+      </View>
+      <Skeleton width="95%" height={14} style={{ marginTop: 4 }} />
+      <Skeleton width="80%" height={14} style={{ marginTop: 3 }} />
+    </View>
+  </View>
+));
+
+const NotificationsSkeletonList = memo(() => (
+  <>
+    {Array.from({ length: 10 }, (_, index) => (
+      <NotificationSkeletonItem key={`skeleton-${index}`} />
+    ))}
+  </>
+));
+
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-
-  const fetchNotifications = useCallback(
-    async (shouldRefresh = false): Promise<void> => {
-      try {
-        if (shouldRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
-        const { data } = await api.get<Notification[]>("/notifications/my");
-        setNotifications(data);
-      } catch (error) {
-        console.error("알림 목록 조회 실패:", error);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    []
-  );
-
-  const handleRefresh = useCallback((): void => {
-    fetchNotifications(true);
-  }, [fetchNotifications]);
-
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
-  const markAsRead = useCallback(async (id: number): Promise<void> => {
-    try {
-      await api.post(`/notifications/${id}/read`);
-
-      setNotifications((prev) =>
-        prev.map((notification) =>
-          notification.id === id
-            ? { ...notification, isRead: true }
-            : notification
-        )
-      );
-    } catch (error) {
-      console.error("알림 읽음 처리 실패:", error);
-    }
-  }, []);
 
   const getNotificationIcon = useCallback((type: string): NotificationIcon => {
     switch (type) {
@@ -110,30 +97,64 @@ export default function NotificationsScreen() {
     }
   }, []);
 
-  const formatDate = useCallback((dateString: string): string => {
+  const fetchNotifications = useCallback(
+    async (shouldRefresh = false): Promise<void> => {
+      try {
+        if (shouldRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        const { data } = await api.get<Notification[]>("/notifications/my");
+        setNotifications(data);
+      } catch (error) {
+        console.error("알림 목록 조회 실패:", error);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    []
+  );
+
+  const handleRefresh = useCallback((): void => {
+    fetchNotifications(true);
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const markAsRead = useCallback(async (id: number): Promise<void> => {
     try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return dateString;
-      }
+      await api.post(`/notifications/${id}/read`);
 
-      const today = new Date();
-      const yesterday = new Date();
-      yesterday.setDate(today.getDate() - 1);
-
-      if (date.toDateString() === today.toDateString()) {
-        const hours = date.getHours().toString().padStart(2, "0");
-        const minutes = date.getMinutes().toString().padStart(2, "0");
-        return `오늘 ${hours}:${minutes}`;
-      } else if (date.toDateString() === yesterday.toDateString()) {
-        return "어제";
-      } else {
-        return `${date.getMonth() + 1}월 ${date.getDate()}일`;
-      }
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.id === id
+            ? { ...notification, isRead: true }
+            : notification
+        )
+      );
     } catch (error) {
-      console.error("날짜 포맷 오류:", error);
-      return dateString;
+      console.error("알림 읽음 처리 실패:", error);
     }
+  }, []);
+
+  const formatRelativeTime = useCallback((dateString: string): string => {
+    const date = dayjs(dateString);
+    const now = dayjs();
+
+    if (now.diff(date, "hour") < 48) {
+      return date.fromNow();
+    }
+
+    if (date.year() === now.year()) {
+      return date.format("M월 D일");
+    }
+
+    return date.format("YYYY년 M월 D일");
   }, []);
 
   const renderItem: ListRenderItem<Notification> = useCallback(
@@ -159,7 +180,7 @@ export default function NotificationsScreen() {
                 {item.title}
               </Text>
               <Text style={styles.notificationDate}>
-                {formatDate(item.createdAt)}
+                {formatRelativeTime(item.createdAt)}
               </Text>
             </View>
 
@@ -167,12 +188,10 @@ export default function NotificationsScreen() {
               {item.body}
             </Text>
           </View>
-
-          {!item.isRead && <View style={styles.unreadDot} />}
         </TouchableOpacity>
       );
     },
-    [getNotificationIcon, formatDate, markAsRead]
+    [getNotificationIcon, formatRelativeTime, markAsRead]
   );
 
   const renderEmpty = useCallback(() => {
@@ -189,11 +208,6 @@ export default function NotificationsScreen() {
       </View>
     );
   }, [loading]);
-
-  const renderSeparator = useCallback(
-    () => <View style={styles.separator} />,
-    []
-  );
 
   const keyExtractor = useCallback(
     (item: Notification): string => item.id.toString(),
@@ -214,50 +228,49 @@ export default function NotificationsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <StatusBar
-        style="dark"
-        backgroundColor={COLORS.white}
-        animated
-        key="notifications-status-bar"
-      />
+    <View style={styles.container}>
+      <View style={styles.statusBarFill} />
+      <StatusBar style="dark" />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-        >
-          <Ionicons name="chevron-back" size={24} color={COLORS.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>알림</Text>
-        <View style={styles.headerRight} />
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary500} />
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+          >
+            <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>알림</Text>
         </View>
-      ) : (
-        <FlatList
-          data={notifications}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={[
-            styles.listContent,
-            notifications.length === 0 && { flex: 1 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={memoizedRefreshControl}
-          ListEmptyComponent={renderEmpty}
-          ItemSeparatorComponent={renderSeparator}
-          maxToRenderPerBatch={10}
-          windowSize={10}
-          initialNumToRender={10}
-          removeClippedSubviews={true}
-        />
-      )}
-    </SafeAreaView>
+      </SafeAreaView>
+
+      <View style={styles.contentWrapper}>
+        {loading && !refreshing ? (
+          <View style={styles.listContent}>
+            <NotificationsSkeletonList />
+          </View>
+        ) : (
+          <FlatList
+            data={notifications}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            contentContainerStyle={[
+              styles.listContent,
+              notifications.length === 0 && { flex: 1 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={memoizedRefreshControl}
+            ListEmptyComponent={renderEmpty}
+            ItemSeparatorComponent={null}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            initialNumToRender={10}
+            removeClippedSubviews={Platform.OS === "android"}
+          />
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -266,12 +279,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
+  statusBarFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === "ios" ? 44 : 24,
+    backgroundColor: COLORS.white,
+    zIndex: 1,
+  },
+  safeArea: {
+    backgroundColor: COLORS.white,
+    zIndex: 2,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
@@ -280,38 +305,38 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: COLORS.text,
+    marginLeft: 8,
+    lineHeight: 24,
   },
   backButton: {
-    padding: 8,
-  },
-  headerRight: {
-    width: 40,
-  },
-  loadingContainer: {
-    flex: 1,
+    width: 24,
+    height: 24,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+  },
+  contentWrapper: {
+    flex: 1,
   },
   listContent: {
     flexGrow: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingVertical: 8,
   },
   notificationItem: {
     flexDirection: "row",
     alignItems: "flex-start",
-    position: "relative",
     paddingVertical: 16,
-    paddingHorizontal: 0,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.white,
+    marginBottom: 1,
   },
   notificationItemRead: {
-    opacity: 0.7,
+    backgroundColor: COLORS.gray50,
   },
   notificationIcon: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 2,
@@ -324,7 +349,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   notificationTitle: {
     fontSize: 15,
@@ -341,19 +366,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     lineHeight: 20,
-  },
-  unreadDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.primary500,
-    position: "absolute",
-    top: 17,
-    right: 0,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: COLORS.gray100,
   },
   emptyContainer: {
     flex: 1,

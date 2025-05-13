@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Animated,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -67,6 +68,8 @@ export default function QRScannerScreen() {
   }
 
   if (!permission.granted) {
+    const isBlocked = permission && !permission.canAskAgain;
+
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <StatusBar style="dark" backgroundColor={COLORS.white} animated />
@@ -74,13 +77,24 @@ export default function QRScannerScreen() {
           <Text style={styles.title}>
             결제 QR 코드 스캔을 위해{"\n"}카메라 접근 권한이 필요합니다
           </Text>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={requestPermission}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.buttonText}>권한 허용하기</Text>
-          </TouchableOpacity>
+
+          {isBlocked ? (
+            <TouchableOpacity
+              style={styles.button}
+              onPress={Linking.openSettings}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.buttonText}>설정으로 이동</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.button}
+              onPress={requestPermission}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.buttonText}>권한 허용하기</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     );

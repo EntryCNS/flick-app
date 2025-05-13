@@ -23,11 +23,9 @@ interface Booth {
   name: string;
   description?: string;
   imageUrl?: string;
-  location?: string;
-  category?: string;
 }
 
-const BACKGROUND_COLOR = COLORS.secondary50;
+const BACKGROUND_COLOR = "#F5F6F8";
 
 const BoothSkeletonLoader = memo(() => (
   <View style={styles.card}>
@@ -36,23 +34,11 @@ const BoothSkeletonLoader = memo(() => (
     </View>
     <View style={styles.boothContent}>
       <Skeleton width={140} height={16} style={{ marginBottom: 8 }} />
-
-      <Skeleton
-        width={70}
-        height={20}
-        style={{ marginBottom: 8, borderRadius: 4 }}
-      />
-
-      <Skeleton width="90%" height={12} style={{ marginBottom: 8 }} />
-      <Skeleton width="60%" height={12} style={{ marginBottom: 8 }} />
-
-      <View style={styles.locationContainer}>
-        <Skeleton width={10} height={10} style={{ borderRadius: 5 }} />
-        <Skeleton width={90} height={12} style={{ marginLeft: 4 }} />
-      </View>
+      <Skeleton width="90%" height={14} style={{ marginBottom: 4 }} />
+      <Skeleton width="60%" height={14} />
     </View>
     <View style={styles.arrowContainer}>
-      <Ionicons name="chevron-forward" size={16} color={COLORS.gray300} />
+      <Skeleton width={16} height={16} style={{ borderRadius: 8 }} />
     </View>
   </View>
 ));
@@ -129,27 +115,10 @@ export default function BoothsScreen() {
           <Text style={styles.boothName} numberOfLines={1}>
             {item.name}
           </Text>
-          {item.category && (
-            <View style={styles.categoryContainer}>
-              <Text style={styles.categoryText}>{item.category}</Text>
-            </View>
-          )}
           {item.description && (
             <Text style={styles.boothDescription} numberOfLines={2}>
               {item.description}
             </Text>
-          )}
-          {item.location && (
-            <View style={styles.locationContainer}>
-              <Ionicons
-                name="location-outline"
-                size={14}
-                color={COLORS.textSecondary}
-              />
-              <Text style={styles.locationText} numberOfLines={1}>
-                {item.location}
-              </Text>
-            </View>
           )}
         </View>
         <View style={styles.arrowContainer}>
@@ -170,6 +139,7 @@ export default function BoothsScreen() {
         {error && (
           <TouchableOpacity
             style={styles.retryButton}
+            activeOpacity={0.7}
             onPress={() => fetchBooths()}
           >
             <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -194,30 +164,12 @@ export default function BoothsScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar animated style="dark" backgroundColor={COLORS.white} />
+      <View style={styles.statusBarFill} />
+      <StatusBar style="dark" />
 
-      <SafeAreaView style={styles.headerArea} edges={["top"]}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>부스</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.settingsButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="search-outline" size={22} color={COLORS.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.settingsButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              onPress={() => router.push("/notifications")}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color={COLORS.text}
-              />
-            </TouchableOpacity>
-          </View>
         </View>
       </SafeAreaView>
 
@@ -259,7 +211,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
-  headerArea: {
+  statusBarFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === "ios" ? 44 : 24,
+    backgroundColor: COLORS.white,
+    zIndex: 1,
+  },
+  safeArea: {
     backgroundColor: COLORS.white,
     zIndex: 2,
   },
@@ -274,20 +235,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   headerTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     color: COLORS.text,
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  settingsButton: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
   },
   contentWrapper: {
     flex: 1,
@@ -308,21 +258,16 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 20,
-    gap: 12,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 100,
+    gap: 10,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
     overflow: "hidden",
     flexDirection: "row",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   boothImageContainer: {
     width: 100,
@@ -340,42 +285,24 @@ const styles = StyleSheet.create({
   },
   boothContent: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     justifyContent: "center",
   },
   boothName: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
-    fontWeight: "600",
     color: COLORS.text,
     marginBottom: 4,
-  },
-  categoryContainer: {
-    backgroundColor: COLORS.primary50,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    alignSelf: "flex-start",
-    marginBottom: 6,
-  },
-  categoryText: {
-    fontSize: 12,
-    color: COLORS.primary700,
-    fontWeight: "500",
+    letterSpacing: -0.2,
   },
   boothDescription: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
     color: COLORS.textSecondary,
     marginBottom: 8,
     lineHeight: 20,
-  },
-  locationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  locationText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginLeft: 4,
+    letterSpacing: -0.1,
   },
   arrowContainer: {
     width: 30,
@@ -390,22 +317,22 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyText: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 16,
     color: COLORS.gray500,
     marginTop: 16,
     marginBottom: 16,
     textAlign: "center",
-    fontWeight: "500",
   },
   retryButton: {
     backgroundColor: COLORS.primary500,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 8,
   },
   retryButtonText: {
+    fontFamily: "Pretendard-SemiBold",
     color: COLORS.white,
-    fontWeight: "600",
     fontSize: 14,
   },
 });

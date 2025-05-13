@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ListRenderItem,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,36 +27,16 @@ interface Notice {
 
 const BACKGROUND_COLOR = "#F5F6F8";
 
-const NoticeSkeletonLoader = memo(() => (
+const NoticeSkeletonLoader = () => (
   <View style={styles.card}>
-    <View style={styles.noticeHeader}>
-      <Skeleton width={80} height={12} style={{ alignSelf: "flex-end" }} />
-    </View>
-
-    <Skeleton width="95%" height={16} style={{ marginBottom: 6 }} />
-    <Skeleton width="60%" height={16} style={{ marginBottom: 12 }} />
-
-    <Skeleton width="90%" height={14} style={{ marginBottom: 4 }} />
-    <Skeleton width="85%" height={14} />
-  </View>
-));
-
-const PinnedNoticeSkeletonLoader = memo(() => (
-  <View style={[styles.card, styles.pinnedNotice]}>
-    <View style={styles.noticeHeader}>
-      <View style={styles.pinnedIcon}>
-        <Skeleton width={14} height={14} borderRadius={7} />
-      </View>
+    <View style={styles.cardHeader}>
       <Skeleton width={80} height={12} />
     </View>
-
-    <Skeleton width="95%" height={16} style={{ marginBottom: 6 }} />
-    <Skeleton width="70%" height={16} style={{ marginBottom: 12 }} />
-
-    <Skeleton width="90%" height={14} style={{ marginBottom: 4 }} />
-    <Skeleton width="85%" height={14} />
+    <Skeleton width="90%" height={16} style={{ marginBottom: 8 }} />
+    <Skeleton width="85%" height={14} style={{ marginBottom: 4 }} />
+    <Skeleton width="70%" height={14} />
   </View>
-));
+);
 
 export default function NoticesScreen() {
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -113,32 +94,30 @@ export default function NoticesScreen() {
   }, []);
 
   const renderNoticeItem: ListRenderItem<Notice> = useCallback(
-    ({ item }) => {
-      return (
-        <TouchableOpacity
-          style={[styles.card, item.isPinned && styles.pinnedNotice]}
-          activeOpacity={0.7}
-          onPress={() => router.push(`/notices/${item.id}`)}
-        >
-          <View style={styles.noticeHeader}>
-            {item.isPinned && (
-              <View style={styles.pinnedIcon}>
-                <Ionicons name="pin" size={14} color={COLORS.danger600} />
-              </View>
-            )}
-            <Text style={styles.dateText}>{formatDate(item.createdAt)}</Text>
-          </View>
+    ({ item }) => (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.7}
+        onPress={() => router.push(`/notices/${item.id}`)}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.dateText}>{formatDate(item.createdAt)}</Text>
+          {item.isPinned && (
+            <View style={styles.pinnedBadge}>
+              <Text style={styles.pinnedText}>고정</Text>
+            </View>
+          )}
+        </View>
 
-          <Text style={styles.noticeTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
+        <Text style={styles.noticeTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
 
-          <Text style={styles.noticeContent} numberOfLines={2}>
-            {item.content}
-          </Text>
-        </TouchableOpacity>
-      );
-    },
+        <Text style={styles.noticeContent} numberOfLines={2}>
+          {item.content}
+        </Text>
+      </TouchableOpacity>
+    ),
     [formatDate]
   );
 
@@ -158,12 +137,14 @@ export default function NoticesScreen() {
   }, [loading]);
 
   const renderSkeletonList = () => (
-    <View style={{ gap: 12 }}>
-      <PinnedNoticeSkeletonLoader />
-      <NoticeSkeletonLoader />
-      <NoticeSkeletonLoader />
-      <NoticeSkeletonLoader />
-    </View>
+    <FlatList
+      data={Array.from({ length: 5 }, (_, i) => i)}
+      renderItem={() => <NoticeSkeletonLoader />}
+      keyExtractor={(_, index) => `skeleton-${index}`}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+    />
   );
 
   const keyExtractor = useCallback((item: Notice) => item.id.toString(), []);
@@ -175,6 +156,7 @@ export default function NoticesScreen() {
         onRefresh={handleRefresh}
         tintColor={COLORS.primary500}
         colors={[COLORS.primary500]}
+        progressBackgroundColor={COLORS.white}
       />
     ),
     [refreshing, handleRefresh]
@@ -182,19 +164,12 @@ export default function NoticesScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" backgroundColor={COLORS.white} animated />
+      <View style={styles.statusBarFill} />
+      <StatusBar style="dark" />
 
-      <SafeAreaView style={styles.headerArea} edges={["top"]}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>공지사항</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.settingsButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="filter-outline" size={22} color={COLORS.text} />
-            </TouchableOpacity>
-          </View>
         </View>
       </SafeAreaView>
 
@@ -202,7 +177,7 @@ export default function NoticesScreen() {
         <View style={styles.bgExtender} />
         <View style={styles.contentContainer}>
           {loading && !refreshing ? (
-            <View style={styles.scrollContent}>{renderSkeletonList()}</View>
+            renderSkeletonList()
           ) : (
             <FlatList
               data={notices}
@@ -212,7 +187,7 @@ export default function NoticesScreen() {
               showsVerticalScrollIndicator={false}
               refreshControl={memoizedRefreshControl}
               ListEmptyComponent={renderEmpty}
-              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+              ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             />
           )}
         </View>
@@ -226,11 +201,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
-  centered: {
-    justifyContent: "center",
-    alignItems: "center",
+  statusBarFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === "ios" ? 44 : 24,
+    backgroundColor: COLORS.white,
+    zIndex: 1,
   },
-  headerArea: {
+  safeArea: {
     backgroundColor: COLORS.white,
     zIndex: 2,
   },
@@ -245,19 +225,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   headerTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     color: COLORS.text,
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  settingsButton: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
   },
   contentWrapper: {
     flex: 1,
@@ -278,48 +248,52 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 20,
-    gap: 12,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 100,
+    gap: 10,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
     overflow: "hidden",
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  pinnedNotice: {
-    backgroundColor: COLORS.danger50,
-  },
-  noticeHeader: {
+  cardHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "flex-end",
-    marginBottom: 8,
-  },
-  pinnedIcon: {
-    marginRight: 6,
+    marginBottom: 10,
   },
   dateText: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 12,
     color: COLORS.textSecondary,
   },
+  pinnedBadge: {
+    backgroundColor: COLORS.primary50,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  pinnedText: {
+    fontFamily: "Pretendard-Medium",
+    fontSize: 11,
+    color: COLORS.primary600,
+  },
   noticeTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
-    fontWeight: "600",
     color: COLORS.text,
     marginBottom: 8,
+    letterSpacing: -0.2,
   },
   noticeContent: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
     color: COLORS.textSecondary,
     lineHeight: 20,
+    letterSpacing: -0.1,
   },
   emptyContainer: {
     flex: 1,
@@ -328,9 +302,9 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyText: {
+    fontFamily: "Pretendard-Medium",
     marginTop: 16,
     fontSize: 16,
-    fontWeight: "500",
     color: COLORS.gray500,
   },
 });

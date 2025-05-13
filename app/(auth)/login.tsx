@@ -1,16 +1,21 @@
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  useEffect,
+} from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
   Image,
   Keyboard,
   Platform,
-  ScrollView,
+  KeyboardAvoidingView,
   TouchableWithoutFeedback,
 } from "react-native";
 import { router } from "expo-router";
@@ -21,22 +26,27 @@ import axios from "axios";
 import { COLORS } from "@/constants/colors";
 import { API_URL } from "@/constants/api";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function LoginScreen(): React.ReactElement {
-  const [id, setId] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [focusedInput, setFocusedInput] = useState<string>("");
-  const [isPasswordVisible, setIsPasswordVisible] = useState<boolean>(false);
+export default function LoginScreen() {
+  const [id, setId] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [focusedInput, setFocusedInput] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   const passwordRef = useRef<TextInput>(null);
-  const { saveTokens, getProfile } = useAuthStore();
+  const { saveTokens, getProfile, signOut } = useAuthStore();
+
+  useEffect(() => {
+    signOut();
+  }, [signOut]);
 
   const togglePasswordVisibility = useCallback(() => {
     setIsPasswordVisible((prev) => !prev);
   }, []);
 
-  const handleLogin = useCallback(async (): Promise<void> => {
+  const handleLogin = useCallback(async () => {
     if (!id.trim() || !password || isLoading) return;
 
     Keyboard.dismiss();
@@ -52,18 +62,32 @@ export default function LoginScreen(): React.ReactElement {
       await getProfile();
       router.replace("/(tabs)");
     } catch (err) {
-      const errorMessage =
-        axios.isAxiosError(err) && err.response?.status === 401
-          ? "아이디 또는 비밀번호가 올바르지 않습니다"
-          : "로그인에 실패했습니다";
+      let errorMessage = "로그인에 실패했습니다";
+
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const { code } = err.response.data;
+
+        switch (code) {
+          case "LOGIN_FAILED":
+            errorMessage = "아이디 또는 비밀번호가 올바르지 않습니다";
+            break;
+          case "TOKEN_EXCHANGE_FAILED":
+            errorMessage = "인증 토큰 발급에 실패했습니다";
+            break;
+          case "USER_FETCH_FAILED":
+            errorMessage = "사용자 정보를 가져오는데 실패했습니다";
+            break;
+          case "REFRESH_FAILED":
+            errorMessage = "인증이 만료되었습니다. 다시 로그인해주세요";
+            break;
+        }
+      }
 
       Toast.show({
         type: "error",
         text1: errorMessage,
         position: Platform.OS === "ios" ? "top" : "bottom",
       });
-
-      console.error("Login error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -107,99 +131,106 @@ export default function LoginScreen(): React.ReactElement {
     [isPasswordVisible]
   );
 
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+  }, []);
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar style="dark" />
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.content}>
-            <View style={styles.logoSection}>
-              <Image
-                source={require("@/assets/images/logo.png")}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-              <Text style={styles.title}>로그인</Text>
-              <Text style={styles.subtitle}>
-                <Text style={styles.dodamText}>도담도담</Text> 계정 정보를
-                입력해주세요
-              </Text>
-            </View>
-
-            <View style={styles.formSection}>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={idInputStyle}
-                  placeholder="아이디"
-                  placeholderTextColor={COLORS.gray400}
-                  value={id}
-                  onChangeText={setId}
-                  onFocus={() => handleFocus("id")}
-                  onBlur={handleBlur}
-                  autoCapitalize="none"
-                  returnKeyType="next"
-                  onSubmitEditing={handleIdSubmit}
-                  blurOnSubmit={false}
-                  autoCorrect={false}
-                  keyboardType="default"
-                  textContentType="username"
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <View style={styles.content}>
+              <View style={styles.logoSection}>
+                <Image
+                  source={require("@/assets/images/logo.png")}
+                  style={styles.logo}
+                  resizeMode="contain"
                 />
+                <Text style={styles.title}>로그인</Text>
+                <Text style={styles.subtitle}>
+                  <Text style={styles.dodamText}>도담도담</Text> 계정 정보를
+                  입력해주세요
+                </Text>
               </View>
 
-              <View style={styles.inputWrapper}>
-                <View style={styles.passwordContainer}>
+              <View style={styles.formSection}>
+                <View style={styles.inputWrapper}>
                   <TextInput
-                    ref={passwordRef}
-                    style={passwordInputStyle}
-                    placeholder="비밀번호"
+                    style={idInputStyle}
+                    placeholder="아이디"
                     placeholderTextColor={COLORS.gray400}
-                    value={password}
-                    onChangeText={setPassword}
-                    onFocus={() => handleFocus("password")}
+                    value={id}
+                    onChangeText={setId}
+                    onFocus={() => handleFocus("id")}
                     onBlur={handleBlur}
-                    secureTextEntry={!isPasswordVisible}
-                    returnKeyType="done"
-                    onSubmitEditing={handleLogin}
-                    textContentType="password"
                     autoCapitalize="none"
+                    returnKeyType="next"
+                    onSubmitEditing={handleIdSubmit}
+                    blurOnSubmit={false}
+                    autoCorrect={false}
+                    keyboardType="default"
+                    textContentType="username"
                   />
-                  <TouchableOpacity
-                    style={styles.visibilityToggle}
-                    onPress={togglePasswordVisibility}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name={eyeIconName}
-                      size={22}
-                      color={COLORS.gray500}
+                </View>
+
+                <View style={styles.inputWrapper}>
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      ref={passwordRef}
+                      style={passwordInputStyle}
+                      placeholder="비밀번호"
+                      placeholderTextColor={COLORS.gray400}
+                      value={password}
+                      onChangeText={setPassword}
+                      onFocus={() => handleFocus("password")}
+                      onBlur={handleBlur}
+                      secureTextEntry={!isPasswordVisible}
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                      textContentType="password"
+                      autoCapitalize="none"
                     />
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.visibilityToggle}
+                      onPress={togglePasswordVisibility}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons
+                        name={eyeIconName}
+                        size={22}
+                        color={COLORS.gray500}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <View style={styles.buttonSection}>
-              <TouchableOpacity
-                style={loginButtonStyle}
-                onPress={handleLogin}
-                disabled={!id.trim() || !password || isLoading}
-                activeOpacity={0.7}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color={COLORS.white} size="small" />
-                ) : (
-                  <Text style={styles.buttonText}>로그인</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.buttonSection}>
+                <TouchableOpacity
+                  style={loginButtonStyle}
+                  onPress={handleLogin}
+                  disabled={!id.trim() || !password || isLoading}
+                  activeOpacity={0.7}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color={COLORS.white} size="small" />
+                  ) : (
+                    <Text style={styles.buttonText}>로그인</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </TouchableWithoutFeedback>
-      </ScrollView>
-    </SafeAreaView>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -208,19 +239,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
-  scrollContent: {
-    flexGrow: 1,
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   content: {
     flex: 1,
     paddingHorizontal: 24,
     justifyContent: "center",
-    paddingBottom: 30,
   },
   logoSection: {
     alignItems: "center",
     marginBottom: 40,
-    marginTop: 40,
   },
   logo: {
     width: 64,

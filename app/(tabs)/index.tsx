@@ -7,15 +7,20 @@ import {
   Animated,
   RefreshControl,
   Image,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
 import api from "@/libs/api";
 import { COLORS } from "@/constants/colors";
 import { useAuthStore } from "@/stores/auth";
 import { StatusBar } from "expo-status-bar";
 import { Skeleton } from "@/components/Skeleton";
+import dayjs from "dayjs";
+
+import "dayjs/locale/ko";
+dayjs.locale("ko");
 
 interface Transaction {
   id: number;
@@ -35,10 +40,7 @@ interface TransactionItemProps {
   transaction: Transaction;
   formatAmount: (amount: number, type: string) => string;
   formatTime: (dateTimeString: string) => string;
-}
-
-interface TransactionSkeletonProps {
-  index: number;
+  onPress: (id: number) => void;
 }
 
 const BACKGROUND_COLOR = "#F5F6F8";
@@ -57,78 +59,67 @@ const AccountSkeletonLoader = memo(() => (
   </View>
 ));
 
-const TransactionSkeletonLoader = memo(
-  ({ index }: TransactionSkeletonProps) => {
-    const nameWidth = [160, 140, 150][index % 3] as number;
-    const amountWidth = [80, 70, 75][index % 3] as number;
-    const dateWidth = [70, 65, 75][index % 3] as number;
-    const placeWidth = [90, 110, 100][index % 3] as number;
-
-    return (
-      <View style={styles.transactionItem}>
-        <View style={styles.transactionRow}>
-          <Skeleton width={nameWidth} height={16} style={{ marginRight: 8 }} />
-          <Skeleton width={amountWidth} height={16} />
-        </View>
-        <View style={[styles.transactionMetaRow, { marginTop: 8 }]}>
-          <Skeleton width={dateWidth} height={12} />
-          <Skeleton width={placeWidth} height={12} />
-        </View>
+const TransactionSkeletonLoader = memo(() => (
+  <View style={styles.transactionItem}>
+    <View
+      style={[styles.transactionIcon, { backgroundColor: COLORS.gray100 }]}
+    />
+    <View style={styles.transactionContent}>
+      <View>
+        <Skeleton width={120} height={15} style={{ marginBottom: 5 }} />
+        <Skeleton width={100} height={13} />
       </View>
-    );
-  }
-);
+      <View style={styles.transactionRight}>
+        <Skeleton width={80} height={16} style={{ marginBottom: 5 }} />
+        <Skeleton width={40} height={12} />
+      </View>
+    </View>
+  </View>
+));
 
 const TransactionItem = memo(
-  ({ transaction, formatAmount, formatTime }: TransactionItemProps) => {
+  ({
+    transaction,
+    formatAmount,
+    formatTime,
+    onPress,
+  }: TransactionItemProps) => {
     const isCharge = transaction.type === "CHARGE";
-
-    const formatDate = (dateString: string): string => {
-      const today = new Date();
-      const date = new Date(dateString);
-
-      if (today.toDateString() === date.toDateString()) {
-        return "오늘";
-      }
-
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      if (yesterday.toDateString() === date.toDateString()) {
-        return "어제";
-      }
-
-      return `${date.getMonth() + 1}월 ${date.getDate()}일`;
-    };
+    const iconName = isCharge ? "wallet" : "shopping-cart";
+    const iconBg = isCharge ? COLORS.success50 : COLORS.primary50;
+    const iconColor = isCharge ? COLORS.success600 : COLORS.primary600;
 
     return (
       <TouchableOpacity
         style={styles.transactionItem}
         activeOpacity={0.6}
-        onPress={() => router.push(`/transactions/${transaction.id}`)}
+        onPress={() => onPress(transaction.id)}
       >
-        <View style={styles.transactionRow}>
-          <Text style={styles.transactionName} numberOfLines={1}>
-            {isCharge ? "포인트 충전" : transaction.product.name}
-          </Text>
-          <Text
-            style={[
-              styles.transactionAmount,
-              isCharge ? styles.amountPositive : styles.amountNegative,
-            ]}
-          >
-            {formatAmount(transaction.amount, transaction.type)}원
-          </Text>
+        <View style={[styles.transactionIcon, { backgroundColor: iconBg }]}>
+          <FontAwesome5 name={iconName} size={16} color={iconColor} solid />
         </View>
-
-        <View style={styles.transactionMetaRow}>
-          <Text style={styles.transactionDate}>
-            {formatDate(transaction.createdAt)}{" "}
-            {formatTime(transaction.createdAt)}
-          </Text>
-          <Text style={styles.transactionPlace} numberOfLines={1}>
-            {isCharge ? transaction.memo || "" : transaction.booth.name}
-          </Text>
+        <View style={styles.transactionContent}>
+          <View>
+            <Text style={styles.transactionTitle} numberOfLines={1}>
+              {isCharge ? "포인트 충전" : transaction.product.name}
+            </Text>
+            <Text style={styles.transactionSubtitle} numberOfLines={1}>
+              {isCharge ? transaction.memo || "" : transaction.booth.name}
+            </Text>
+          </View>
+          <View style={styles.transactionRight}>
+            <Text
+              style={[
+                styles.transactionAmount,
+                isCharge ? styles.amountPositive : styles.amountNegative,
+              ]}
+            >
+              {formatAmount(transaction.amount, transaction.type)}원
+            </Text>
+            <Text style={styles.transactionDate}>
+              {formatTime(transaction.createdAt)}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -141,15 +132,7 @@ export default function HomeScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  const scrollY = useRef(new Animated.Value(0)).current;
   const refreshAnim = useRef(new Animated.Value(0)).current;
-
-  const headerBackgroundColor = scrollY.interpolate({
-    inputRange: [0, 50],
-    outputRange: [BACKGROUND_COLOR, COLORS.white],
-    extrapolate: "clamp",
-  });
 
   const spin = refreshAnim.interpolate({
     inputRange: [0, 1],
@@ -162,20 +145,13 @@ export default function HomeScreen() {
   }, []);
 
   const formatTime = useCallback((dateTimeString: string): string => {
-    const date = new Date(dateTimeString);
-    return date.toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    return dayjs(dateTimeString).format("HH:mm");
   }, []);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (): Promise<void> => {
     if (!user) return;
-
     try {
       setRefreshing(true);
-
       Animated.timing(refreshAnim, {
         toValue: 1,
         duration: 800,
@@ -189,7 +165,6 @@ export default function HomeScreen() {
 
       setBalance(balanceResponse.data);
       setTransactions(transactionsResponse.data);
-
       refreshAnim.setValue(0);
     } catch (error) {
       console.error("Failed to fetch data:", error);
@@ -199,11 +174,15 @@ export default function HomeScreen() {
     }
   }, [user, refreshAnim]);
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback((): void => {
     if (!refreshing) {
       fetchData();
     }
   }, [refreshing, fetchData]);
+
+  const navigateToTransactionDetail = useCallback((id: number): void => {
+    router.push(`/transactions/${id}`);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -211,26 +190,26 @@ export default function HomeScreen() {
     }
   }, [user, fetchData]);
 
-  const renderTransactionSkeletons = () => (
-    <>
-      {[0, 1, 2].map((index) => (
-        <TransactionSkeletonLoader key={`skeleton-${index}`} index={index} />
-      ))}
-    </>
+  const renderTransactionSkeletons = useCallback(
+    () => (
+      <>
+        {Array.from({ length: 5 }, (_, index) => (
+          <TransactionSkeletonLoader key={`skeleton-${index}`} />
+        ))}
+      </>
+    ),
+    []
   );
 
   return (
     <View style={styles.container}>
-      <StatusBar animated style="light" backgroundColor={BACKGROUND_COLOR} />
+      <StatusBar style="dark" backgroundColor={BACKGROUND_COLOR} />
 
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <Animated.View
-          style={[styles.header, { backgroundColor: headerBackgroundColor }]}
-        >
+        <View style={styles.header}>
           <Text style={styles.logoText}>
             <Text style={styles.highlightText}>F</Text>lick
           </Text>
-
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={styles.headerButton}
@@ -239,34 +218,29 @@ export default function HomeScreen() {
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                <Ionicons
-                  name="refresh-outline"
-                  size={18}
+                <FontAwesome5
+                  name="sync-alt"
+                  size={15}
                   color={
-                    refreshing || loading ? COLORS.primary500 : COLORS.text
+                    refreshing || loading ? COLORS.primary500 : COLORS.gray500
                   }
                 />
               </Animated.View>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.headerButton}
               onPress={() => router.push("/notifications")}
               disabled={loading && !user}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons
-                name="notifications-outline"
-                size={18}
-                color={COLORS.text}
-              />
+              <FontAwesome5 name="bell" size={15} color={COLORS.gray500} />
               {!loading && user && <View style={styles.notificationBadge} />}
             </TouchableOpacity>
           </View>
-        </Animated.View>
+        </View>
       </SafeAreaView>
 
-      <Animated.ScrollView
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -277,17 +251,9 @@ export default function HomeScreen() {
             tintColor={COLORS.primary500}
             colors={[COLORS.primary500]}
             progressBackgroundColor={COLORS.white}
-            progressViewOffset={20}
           />
         }
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
       >
-        <View style={styles.extender} />
-
         <TouchableOpacity
           style={styles.card}
           activeOpacity={0.7}
@@ -296,16 +262,25 @@ export default function HomeScreen() {
         >
           <View style={styles.cardInner}>
             <Text style={styles.cardTitle}>결제하기</Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+            <FontAwesome5
+              name="chevron-right"
+              size={12}
+              color={COLORS.gray300}
+              style={styles.chevronIcon}
+            />
           </View>
         </TouchableOpacity>
 
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>계좌</Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+            <FontAwesome5
+              name="chevron-right"
+              size={12}
+              color={COLORS.gray300}
+              style={styles.chevronIcon}
+            />
           </View>
-
           {loading || !user || balance === null ? (
             <AccountSkeletonLoader />
           ) : (
@@ -320,7 +295,6 @@ export default function HomeScreen() {
                   resizeMode="contain"
                 />
               </View>
-
               <View style={styles.accountDetails}>
                 <Text style={styles.accountName}>{user.name}님의 통장</Text>
                 <View style={styles.balanceRow}>
@@ -341,10 +315,14 @@ export default function HomeScreen() {
           disabled={loading && !user}
         >
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>결제 내역</Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+            <Text style={styles.cardTitle}>거래 내역</Text>
+            <FontAwesome5
+              name="chevron-right"
+              size={12}
+              color={COLORS.gray300}
+              style={styles.chevronIcon}
+            />
           </View>
-
           <View style={styles.transactionsList}>
             {loading || !user ? (
               <View style={styles.transactionsContent}>
@@ -352,28 +330,25 @@ export default function HomeScreen() {
               </View>
             ) : transactions.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons
-                  name="receipt-outline"
-                  size={22}
-                  color={COLORS.gray300}
-                />
+                <FontAwesome5 name="receipt" size={20} color={COLORS.gray300} />
                 <Text style={styles.emptyText}>거래 내역이 없습니다</Text>
               </View>
             ) : (
               <View style={styles.transactionsContent}>
-                {transactions.slice(0, 3).map((transaction, index) => (
+                {transactions.slice(0, 5).map((transaction) => (
                   <TransactionItem
                     key={transaction.id}
                     transaction={transaction}
                     formatAmount={formatAmount}
                     formatTime={formatTime}
+                    onPress={navigateToTransactionDetail}
                   />
                 ))}
               </View>
             )}
           </View>
         </TouchableOpacity>
-      </Animated.ScrollView>
+      </ScrollView>
     </View>
   );
 }
@@ -387,28 +362,19 @@ const styles = StyleSheet.create({
     backgroundColor: BACKGROUND_COLOR,
     zIndex: 2,
   },
-  extender: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: -1000,
-    height: 1000,
-    backgroundColor: BACKGROUND_COLOR,
-    zIndex: -1,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
-    zIndex: 1,
+    backgroundColor: BACKGROUND_COLOR,
   },
   logoText: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 22,
-    fontWeight: "600",
     color: COLORS.text,
     letterSpacing: -0.3,
   },
@@ -418,7 +384,7 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 18,
   },
   headerButton: {
     width: 32,
@@ -437,47 +403,49 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: BACKGROUND_COLOR,
   },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 20,
-    gap: 12,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 100,
+    gap: 10,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   cardInner: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 20,
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
+  },
+  chevronIcon: {
+    opacity: 0.7,
+    marginRight: 2,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontFamily: "Pretendard-Bold",
+    fontSize: 21,
     color: COLORS.text,
+    lineHeight: 28,
+    letterSpacing: -0.3,
   },
   accountContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingBottom: 16,
+    paddingHorizontal: 22,
+    paddingBottom: 18,
   },
   accountLogoContainer: {
     width: 40,
@@ -496,84 +464,99 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   accountName: {
-    fontSize: 14,
+    fontFamily: "Pretendard-Medium",
+    fontSize: 13,
     color: COLORS.textSecondary,
-    marginBottom: 3,
-    fontWeight: "400",
+    marginBottom: 5,
   },
   balanceRow: {
     flexDirection: "row",
     alignItems: "baseline",
   },
   accountBalance: {
-    fontSize: 20,
-    fontWeight: "600",
+    fontFamily: "Pretendard-Bold",
+    fontSize: 18,
     color: COLORS.text,
+    letterSpacing: -0.3,
   },
   wonText: {
-    fontSize: 14,
-    fontWeight: "400",
+    fontFamily: "Pretendard-Bold",
+    fontSize: 18,
     color: COLORS.text,
-    marginLeft: 2,
-    marginBottom: 0,
+    marginLeft: 1,
+    letterSpacing: -0.3,
   },
   transactionsList: {
-    paddingHorizontal: 18,
-    paddingBottom: 10,
+    paddingHorizontal: 22,
+    paddingBottom: 12,
+    backgroundColor: COLORS.white,
   },
   transactionsContent: {
-    gap: 10,
+    gap: 6,
   },
   emptyContainer: {
-    padding: 22,
+    padding: 20,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: COLORS.white,
   },
   emptyText: {
+    fontFamily: "Pretendard-Medium",
     marginTop: 10,
     fontSize: 14,
-    fontWeight: "400",
     color: COLORS.gray500,
   },
   transactionItem: {
-    paddingVertical: 10,
-    marginBottom: 2,
-    backgroundColor: "white",
-    borderRadius: 8,
-  },
-  transactionRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  transactionMetaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 2,
+    backgroundColor: COLORS.white,
     alignItems: "center",
   },
-  transactionName: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: COLORS.text,
+  transactionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  transactionContent: {
     flex: 1,
-    marginRight: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginLeft: 16,
+  },
+  transactionTitle: {
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 15,
+    color: COLORS.text,
+    marginBottom: 4,
+    lineHeight: 19,
+    letterSpacing: -0.2,
+  },
+  transactionSubtitle: {
+    fontFamily: "Pretendard-Medium",
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    lineHeight: 17,
+    letterSpacing: -0.1,
+  },
+  transactionRight: {
+    alignItems: "flex-end",
   },
   transactionAmount: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 15,
-    fontWeight: "600",
+    marginBottom: 4,
+    lineHeight: 19,
+    letterSpacing: -0.2,
   },
   transactionDate: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 12,
     color: COLORS.textSecondary,
-    fontWeight: "400",
-  },
-  transactionPlace: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: "400",
-    textAlign: "right",
-    maxWidth: 140,
+    lineHeight: 15,
   },
   amountPositive: {
     color: COLORS.success600,

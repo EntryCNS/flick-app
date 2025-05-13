@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthStore } from "@/stores/auth";
@@ -37,7 +38,6 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!user && !isRedirecting) {
-      signOut();
       setIsRedirecting(true);
       router.replace("/(auth)/login");
     }
@@ -77,22 +77,12 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar
-        style="dark"
-        backgroundColor={COLORS.white}
-        animated
-        key="profile-status-bar"
-      />
+      <View style={styles.statusBarFill} />
+      <StatusBar style="dark" />
 
-      <SafeAreaView style={styles.headerArea} edges={["top"]}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>프로필</Text>
-          <TouchableOpacity
-            style={styles.settingsButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="settings-outline" size={22} color={COLORS.text} />
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
@@ -130,44 +120,19 @@ export default function ProfileScreen() {
                     <Text style={styles.studentInfo}>{studentInfo}</Text>
                   )}
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={COLORS.gray500}
-                />
               </View>
             </TouchableOpacity>
-
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>계정 관리</Text>
-              </View>
-
-              <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
-                <Text style={styles.menuText}>계정 정보</Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={COLORS.gray500}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
-                <Text style={styles.menuText}>알림 설정</Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={COLORS.gray500}
-                />
-              </TouchableOpacity>
-            </View>
 
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>지원</Text>
               </View>
 
-              <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.7}
+                onPress={() => router.push("/help")}
+              >
                 <Text style={styles.menuText}>도움말</Text>
                 <Ionicons
                   name="chevron-forward"
@@ -176,8 +141,25 @@ export default function ProfileScreen() {
                 />
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.7}
+                onPress={() => router.push("/service-info")}
+              >
                 <Text style={styles.menuText}>서비스 정보</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.gray500}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.7}
+                onPress={() => router.push("/inquiry")}
+              >
+                <Text style={styles.menuText}>문의하기</Text>
                 <Ionicons
                   name="chevron-forward"
                   size={16}
@@ -246,7 +228,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  headerArea: {
+  statusBarFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === "ios" ? 44 : 24,
+    backgroundColor: COLORS.white,
+    zIndex: 1,
+  },
+  safeArea: {
     backgroundColor: COLORS.white,
     zIndex: 2,
   },
@@ -261,15 +252,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   headerTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     color: COLORS.text,
-  },
-  settingsButton: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
   },
   contentWrapper: {
     flex: 1,
@@ -293,10 +278,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 20,
-    gap: 12,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 100,
+    gap: 10,
   },
   card: {
     backgroundColor: COLORS.white,
@@ -331,8 +316,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   username: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
-    fontWeight: "600",
     color: COLORS.text,
     marginRight: 8,
   },
@@ -343,11 +328,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   roleText: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 11,
-    fontWeight: "600",
     color: COLORS.primary600,
   },
   studentInfo: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
     color: COLORS.textSecondary,
   },
@@ -355,24 +341,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 16,
   },
   cardTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     color: COLORS.text,
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 14,
   },
   menuText: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 15,
-    fontWeight: "500",
     color: COLORS.text,
   },
   logoutButton: {
@@ -382,8 +368,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoutText: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
-    fontWeight: "600",
     color: COLORS.danger600,
   },
   modalOverlay: {
@@ -403,12 +389,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   dialogTitle: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 18,
-    fontWeight: "700",
     color: COLORS.text,
     marginBottom: 8,
   },
   dialogMessage: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 15,
     color: COLORS.textSecondary,
     marginBottom: 24,
@@ -428,8 +415,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.gray100,
   },
   cancelButtonText: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     color: COLORS.text,
   },
   confirmButton: {
@@ -441,8 +428,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger500,
   },
   confirmButtonText: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     color: COLORS.white,
   },
 });

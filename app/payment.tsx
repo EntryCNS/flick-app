@@ -16,10 +16,11 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  Platform,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/colors";
 import { usePaymentStore } from "@/stores/payment";
 import api from "@/libs/api";
@@ -30,7 +31,6 @@ const SLIDER_THUMB_SIZE = 52;
 
 export default function PaymentScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
-  const insets = useSafeAreaInsets();
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [showErrorAlert, setShowErrorAlert] = useState(false);
   const alertOpacity = useRef(new Animated.Value(0)).current;
@@ -217,13 +217,9 @@ export default function PaymentScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar
-          style="dark"
-          backgroundColor={COLORS.white}
-          animated
-          key="payment-status-bar"
-        />
+      <View style={styles.container}>
+        <View style={styles.statusBarFill} />
+        <StatusBar style="dark" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary600} />
           <Text style={styles.loadingText}>결제 정보를 불러오는 중...</Text>
@@ -234,14 +230,9 @@ export default function PaymentScreen() {
 
   if (error || !order || !paymentRequest) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar
-          style="dark"
-          backgroundColor={COLORS.white}
-          animated
-          key="payment-status-bar"
-        />
-
+      <View style={styles.container}>
+        <View style={styles.statusBarFill} />
+        <StatusBar style="dark" />
         <View style={styles.errorContainer}>
           <Ionicons
             name="alert-circle-outline"
@@ -252,7 +243,7 @@ export default function PaymentScreen() {
             {error || "결제 정보를 불러올 수 없습니다"}
           </Text>
           <TouchableOpacity
-            style={styles.backButton}
+            style={styles.errorBackButton}
             onPress={() => router.back()}
             activeOpacity={0.85}
           >
@@ -264,122 +255,121 @@ export default function PaymentScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar
-        style="dark"
-        backgroundColor={COLORS.white}
-        animated
-        key="payment-status-bar"
-      />
+    <View style={styles.container}>
+      <View style={styles.statusBarFill} />
+      <StatusBar style="dark" />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerBackButton}
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="chevron-back" size={24} color={COLORS.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>결제</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.card}>
-          <View style={styles.boothSection}>
-            <Text style={styles.boothName}>{order.booth.name}</Text>
-            <Text style={styles.orderNumber}>#{order.id}</Text>
-          </View>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>결제</Text>
         </View>
+      </SafeAreaView>
 
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>주문 내역</Text>
+      <View style={styles.contentWrapper}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.card}>
+            <View style={styles.boothSection}>
+              <Text style={styles.boothName}>{order.booth.name}</Text>
+              <Text style={styles.orderNumber}>#{order.id}</Text>
+            </View>
           </View>
 
-          {order.items.map((item, index) => (
-            <View key={index} style={styles.orderItem}>
-              <View style={styles.orderItemMain}>
-                <Text style={styles.itemName}>{item.product.name}</Text>
-                <Text style={styles.itemPrice}>
-                  {(item.price * item.quantity).toLocaleString()}원
+          <View style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>주문 내역</Text>
+            </View>
+
+            {order.items.map((item, index) => (
+              <View key={index} style={styles.orderItem}>
+                <View style={styles.orderItemMain}>
+                  <Text style={styles.itemName}>{item.product.name}</Text>
+                  <Text style={styles.itemPrice}>
+                    {(item.price * item.quantity).toLocaleString()}원
+                  </Text>
+                </View>
+                <Text style={styles.itemSubtext}>
+                  {item.price.toLocaleString()}원 × {item.quantity}개
                 </Text>
               </View>
-              <Text style={styles.itemSubtext}>
-                {item.price.toLocaleString()}원 × {item.quantity}개
+            ))}
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>결제 정보</Text>
+            </View>
+
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>결제 방식</Text>
+              <Text style={styles.infoValue}>
+                {paymentRequest.method === "QR_CODE" ? "QR 코드" : "학번"} 결제
               </Text>
             </View>
-          ))}
-        </View>
 
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>결제 정보</Text>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>결제 금액</Text>
+              <Text style={styles.totalAmount}>
+                {order.totalAmount.toLocaleString()}원
+              </Text>
+            </View>
           </View>
+        </ScrollView>
 
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>결제 방식</Text>
-            <Text style={styles.infoValue}>
-              {paymentRequest.method === "QR_CODE" ? "QR 코드" : "학번"} 결제
-            </Text>
-          </View>
+        <View style={styles.footer}>
+          {slideCompleted || confirming ? (
+            <View
+              style={[
+                styles.confirmButton,
+                confirming && styles.confirmButtonDisabled,
+              ]}
+            >
+              <ActivityIndicator color={COLORS.white} size="small" />
+            </View>
+          ) : (
+            <View style={styles.sliderContainer}>
+              <View style={styles.sliderTrack}>
+                <Animated.View
+                  style={[
+                    styles.sliderProgress,
+                    {
+                      transform: [
+                        { translateX: -slideMaxWidth / 2 },
+                        { scaleX: slideProgress },
+                        { translateX: slideMaxWidth / 2 },
+                      ],
+                    },
+                  ]}
+                />
+                <Text style={styles.sliderText}>
+                  오른쪽으로 밀어서 결제하기
+                </Text>
+              </View>
 
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>결제 금액</Text>
-            <Text style={styles.totalAmount}>
-              {order.totalAmount.toLocaleString()}원
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
-
-      <View
-        style={[styles.footer, { paddingBottom: Math.max(14, insets.bottom) }]}
-      >
-        {slideCompleted || confirming ? (
-          <View
-            style={[
-              styles.confirmButton,
-              confirming && styles.confirmButtonDisabled,
-            ]}
-          >
-            <ActivityIndicator color={COLORS.white} size="small" />
-          </View>
-        ) : (
-          <View style={styles.sliderContainer}>
-            <View style={styles.sliderTrack}>
               <Animated.View
                 style={[
-                  styles.sliderProgress,
+                  styles.sliderThumb,
                   {
-                    transform: [
-                      { translateX: -slideMaxWidth / 2 },
-                      { scaleX: slideProgress },
-                      { translateX: slideMaxWidth / 2 },
-                    ],
+                    transform: [{ translateX: slideAnimation }],
                   },
                 ]}
-              />
-              <Text style={styles.sliderText}>오른쪽으로 밀어서 결제하기</Text>
+                {...panResponder.panHandlers}
+              >
+                <Ionicons name="arrow-forward" size={24} color={COLORS.white} />
+              </Animated.View>
             </View>
-
-            <Animated.View
-              style={[
-                styles.sliderThumb,
-                {
-                  transform: [{ translateX: slideAnimation }],
-                },
-              ]}
-              {...panResponder.panHandlers}
-            >
-              <Ionicons name="arrow-forward" size={24} color={COLORS.white} />
-            </Animated.View>
-          </View>
-        )}
+          )}
+        </View>
       </View>
 
       <Modal visible={showSuccessAlert} transparent={true} animationType="none">
@@ -432,19 +422,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BACKGROUND_COLOR,
   },
+  statusBarFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === "ios" ? 44 : 24,
+    backgroundColor: COLORS.white,
+    zIndex: 1,
+  },
+  safeArea: {
+    backgroundColor: COLORS.white,
+    zIndex: 2,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 14,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
   },
-  headerBackButton: {
-    width: 28,
-    height: 28,
+  backButton: {
+    width: 24,
+    height: 24,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -452,6 +454,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: COLORS.text,
+    marginLeft: 8,
+    lineHeight: 24,
+  },
+  contentWrapper: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -541,6 +548,7 @@ const styles = StyleSheet.create({
   footer: {
     padding: 14,
     paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 34 : 14,
   },
   confirmButton: {
     backgroundColor: COLORS.primary600,
@@ -551,11 +559,6 @@ const styles = StyleSheet.create({
   },
   confirmButtonDisabled: {
     opacity: 0.7,
-  },
-  confirmButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: "600",
   },
   sliderContainer: {
     position: "relative",
@@ -625,7 +628,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: "center",
   },
-  backButton: {
+  errorBackButton: {
     backgroundColor: COLORS.primary600,
     paddingVertical: 12,
     paddingHorizontal: 24,

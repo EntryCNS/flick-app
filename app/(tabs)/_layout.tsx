@@ -9,6 +9,7 @@ import {
   View,
   StyleSheet,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/colors";
@@ -16,7 +17,7 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
 export default function TabsLayout() {
-  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const { isLoggedIn, user, isLoading, checkAuth, getProfile } = useAuthStore();
   const initialize = useNotificationStore((state) => state.initialize);
   const registerToken = useNotificationStore((state) => state.registerToken);
   const listenForNotifications = useNotificationStore(
@@ -24,7 +25,19 @@ export default function TabsLayout() {
   );
 
   const insets = useSafeAreaInsets();
-  const bottomInset = Platform.OS === "ios" ? insets.bottom : 0;
+  const bottomInset = insets.bottom;
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const isAuth = await checkAuth();
+
+      if (isAuth && !user) {
+        await getProfile();
+      }
+    };
+
+    initAuth();
+  }, []);
 
   useEffect(() => {
     async function setupNotifications() {
@@ -36,13 +49,13 @@ export default function TabsLayout() {
       }
     }
 
-    if (isLoggedIn) {
+    if (isLoggedIn && user) {
       setupNotifications();
     }
-  }, [isLoggedIn, initialize, registerToken]);
+  }, [isLoggedIn, user, initialize, registerToken]);
 
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || !user) return;
 
     const unsubscribe = listenForNotifications();
 
@@ -51,13 +64,21 @@ export default function TabsLayout() {
         unsubscribe();
       }
     };
-  }, [isLoggedIn, listenForNotifications]);
+  }, [isLoggedIn, user, listenForNotifications]);
 
   const navigateToQRScanner = () => {
     router.push("/qr-scanner");
   };
 
-  if (!isLoggedIn) {
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary600} />
+      </View>
+    );
+  }
+
+  if (!isLoggedIn || !user) {
     return <Redirect href="/(auth)/login" />;
   }
 
@@ -71,10 +92,25 @@ export default function TabsLayout() {
             height: 56 + bottomInset,
             paddingBottom: bottomInset,
             backgroundColor: COLORS.white,
-            borderTopWidth: 0.5,
-            borderTopColor: COLORS.gray200,
-            borderTopLeftRadius: 10,
-            borderTopRightRadius: 10,
+            borderTopWidth: 1,
+            borderTopColor: COLORS.gray100,
+            borderLeftWidth: 1,
+            borderRightWidth: 1,
+            borderColor: COLORS.gray100,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            shadowColor: "#000",
+            shadowOffset: {
+              width: 0,
+              height: -2,
+            },
+            shadowOpacity: 0.05,
+            shadowRadius: 3,
+            elevation: 4,
           },
           tabBarActiveTintColor: COLORS.primary600,
           tabBarInactiveTintColor: COLORS.gray400,
@@ -117,7 +153,7 @@ export default function TabsLayout() {
             tabBarLabel: "",
             tabBarIcon: () => null,
             tabBarButton: () => (
-              <View style={styles.qrContainer}>
+              <View style={styles.qrButtonWrapper}>
                 <TouchableOpacity
                   style={styles.qrButton}
                   activeOpacity={0.85}
@@ -128,7 +164,7 @@ export default function TabsLayout() {
                 >
                   <Ionicons name="qr-code" size={22} color={COLORS.white} />
                 </TouchableOpacity>
-                <Text style={styles.qrText}>결제</Text>
+                <Text style={styles.qrButtonLabel}>결제</Text>
               </View>
             ),
           }}
@@ -165,7 +201,13 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  qrContainer: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.white,
+  },
+  qrButtonWrapper: {
     alignItems: "center",
     top: -15,
   },
@@ -176,8 +218,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary600,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  qrText: {
+  qrButtonLabel: {
     fontSize: 11,
     fontWeight: "500",
     color: COLORS.primary600,

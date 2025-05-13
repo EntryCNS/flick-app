@@ -29,7 +29,6 @@ export const useNotificationStore = create<
     isInitialized: false,
 
     initialize: async (): Promise<void> => {
-      // 이미 초기화 중이거나 완료되었다면 반환
       if (initializing || get().isInitialized) return;
       initializing = true;
 
