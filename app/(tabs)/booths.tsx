@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from "react";
+import React, { useCallback, memo } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { COLORS } from "@/constants/colors";
 import api from "@/libs/api";
 import { StatusBar } from "expo-status-bar";
@@ -43,42 +44,84 @@ const BoothSkeletonLoader = memo(() => (
   </View>
 ));
 
+const BoothCard = memo(
+  ({ booth, onPress }: { booth: Booth; onPress: (id: number) => void }) => (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.7}
+      onPress={() => onPress(booth.id)}
+    >
+      <View style={styles.boothImageContainer}>
+        {booth.imageUrl ? (
+          <Image
+            source={{ uri: booth.imageUrl }}
+            style={styles.boothImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.boothImage, styles.boothImagePlaceholder]}>
+            <Ionicons
+              name="storefront-outline"
+              size={32}
+              color={COLORS.gray400}
+            />
+          </View>
+        )}
+      </View>
+      <View style={styles.boothContent}>
+        <Text style={styles.boothName} numberOfLines={1}>
+          {booth.name}
+        </Text>
+        {booth.description && (
+          <Text style={styles.boothDescription} numberOfLines={2}>
+            {booth.description}
+          </Text>
+        )}
+      </View>
+      <View style={styles.arrowContainer}>
+        <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+      </View>
+    </TouchableOpacity>
+  )
+);
+
+const EmptyComponent = memo(
+  ({ error, onRetry }: { error: string | null; onRetry: () => void }) => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="storefront-outline" size={64} color={COLORS.gray300} />
+      <Text style={styles.emptyText}>
+        {error ? error : "등록된 부스가 없습니다"}
+      </Text>
+      {error && (
+        <TouchableOpacity
+          style={styles.retryButton}
+          activeOpacity={0.7}
+          onPress={onRetry}
+        >
+          <Text style={styles.retryButtonText}>다시 시도</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  )
+);
+
 export default function BoothsScreen() {
-  const [booths, setBooths] = useState<Booth[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const fetchBooths = useCallback(async (): Promise<Booth[]> => {
+    const { data } = await api.get<Booth[]>("/booths");
+    return data;
+  }, []);
 
-  const fetchBooths = useCallback(
-    async (shouldRefresh = false): Promise<void> => {
-      try {
-        if (shouldRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
-        const { data } = await api.get<Booth[]>("/booths");
-        setBooths(data);
-        setError(null);
-      } catch (error) {
-        console.error("부스 목록 조회 실패:", error);
-        setError("부스 정보를 불러오는데 실패했습니다");
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    []
-  );
-
-  const handleRefresh = useCallback(() => {
-    fetchBooths(true);
-  }, [fetchBooths]);
-
-  useEffect(() => {
-    fetchBooths();
-  }, [fetchBooths]);
+  const {
+    data: booths = [],
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useQuery({
+    queryKey: ["booths"],
+    queryFn: fetchBooths,
+    staleTime: 60 * 1000, // 1분
+  });
 
   const navigateToBoothDetail = useCallback((boothId: number) => {
     router.push({
@@ -87,80 +130,27 @@ export default function BoothsScreen() {
     });
   }, []);
 
-  const renderBoothCard: ListRenderItem<Booth> = useCallback(
-    ({ item }) => (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.7}
-        onPress={() => navigateToBoothDetail(item.id)}
-      >
-        <View style={styles.boothImageContainer}>
-          {item.imageUrl ? (
-            <Image
-              source={{ uri: item.imageUrl }}
-              style={styles.boothImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.boothImage, styles.boothImagePlaceholder]}>
-              <Ionicons
-                name="storefront-outline"
-                size={32}
-                color={COLORS.gray400}
-              />
-            </View>
-          )}
-        </View>
-        <View style={styles.boothContent}>
-          <Text style={styles.boothName} numberOfLines={1}>
-            {item.name}
-          </Text>
-          {item.description && (
-            <Text style={styles.boothDescription} numberOfLines={2}>
-              {item.description}
-            </Text>
-          )}
-        </View>
-        <View style={styles.arrowContainer}>
-          <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
-        </View>
-      </TouchableOpacity>
-    ),
+  const renderBoothItem: ListRenderItem<Booth> = useCallback(
+    ({ item }) => <BoothCard booth={item} onPress={navigateToBoothDetail} />,
     [navigateToBoothDetail]
   );
 
-  const renderEmptyComponent = useCallback(
+  const keyExtractor = useCallback((item: Booth) => `booth-${item.id}`, []);
+
+  const renderSkeletonList = useCallback(
     () => (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="storefront-outline" size={64} color={COLORS.gray300} />
-        <Text style={styles.emptyText}>
-          {error ? error : "등록된 부스가 없습니다"}
-        </Text>
-        {error && (
-          <TouchableOpacity
-            style={styles.retryButton}
-            activeOpacity={0.7}
-            onPress={() => fetchBooths()}
-          >
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <FlatList
+        data={Array.from({ length: 5 }, (_, i) => i + 1)}
+        renderItem={() => <BoothSkeletonLoader />}
+        keyExtractor={(item) => `skeleton-${item}`}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      />
     ),
-    [error, fetchBooths]
+    []
   );
 
-  const renderSkeletonList = () => (
-    <FlatList
-      data={Array.from({ length: 5 }, (_, i) => i + 1)}
-      renderItem={() => <BoothSkeletonLoader />}
-      keyExtractor={(item) => `skeleton-${item}`}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    />
-  );
-
-  const keyExtractor = useCallback((item: Booth) => item.id.toString(), []);
+  const errorMessage = isError ? "부스 정보를 불러오는데 실패했습니다" : null;
 
   return (
     <View style={styles.container}>
@@ -176,24 +166,26 @@ export default function BoothsScreen() {
       <View style={styles.contentWrapper}>
         <View style={styles.bgExtender} />
         <View style={styles.contentContainer}>
-          {loading && !refreshing ? (
+          {isLoading && !isFetching ? (
             renderSkeletonList()
           ) : (
             <FlatList
               data={booths}
-              renderItem={renderBoothCard}
+              renderItem={renderBoothItem}
               keyExtractor={keyExtractor}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
+                  refreshing={isFetching && !isLoading}
+                  onRefresh={refetch}
                   tintColor={COLORS.primary500}
                   colors={[COLORS.primary500]}
                 />
               }
-              ListEmptyComponent={renderEmptyComponent}
+              ListEmptyComponent={
+                <EmptyComponent error={errorMessage} onRetry={refetch} />
+              }
               initialNumToRender={8}
               maxToRenderPerBatch={5}
               windowSize={10}

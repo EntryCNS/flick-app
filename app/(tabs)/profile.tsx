@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, memo } from "react";
 import {
   Text,
   View,
@@ -29,7 +29,156 @@ export interface User {
   role: "STUDENT" | "TEACHER";
 }
 
+type PathType = "/help" | "/service-info" | "/inquiry";
+
+interface MenuItem {
+  id: string;
+  title: string;
+  path: PathType;
+}
+
+interface MenuGroup {
+  title: string;
+  children: MenuItem[];
+}
+
 const BACKGROUND_COLOR = "#F5F6F8";
+
+const MENUS: MenuGroup[] = [
+  {
+    title: "지원",
+    children: [
+      { id: "help", title: "도움말", path: "/help" },
+      { id: "service-info", title: "서비스 정보", path: "/service-info" },
+      { id: "inquiry", title: "문의하기", path: "/inquiry" },
+    ],
+  },
+];
+
+const MenuItem = memo(
+  ({
+    item,
+    onPress,
+  }: {
+    item: MenuItem;
+    onPress: (path: PathType) => void;
+  }) => (
+    <TouchableOpacity
+      style={styles.menuItem}
+      activeOpacity={0.7}
+      onPress={() => onPress(item.path)}
+    >
+      <Text style={styles.menuText}>{item.title}</Text>
+      <Ionicons name="chevron-forward" size={16} color={COLORS.gray500} />
+    </TouchableOpacity>
+  )
+);
+
+const MenuGroup = memo(
+  ({
+    group,
+    onPress,
+  }: {
+    group: MenuGroup;
+    onPress: (path: PathType) => void;
+  }) => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>{group.title}</Text>
+      </View>
+
+      {group.children.map((item) => (
+        <MenuItem key={item.id} item={item} onPress={onPress} />
+      ))}
+    </View>
+  )
+);
+
+const ProfileCard = memo(({ user }: { user: User }) => {
+  const studentInfo = useCallback(() => {
+    if (user.grade && user.room && user.number) {
+      return `${user.grade}학년 ${user.room}반 ${user.number}번`;
+    }
+    return null;
+  }, [user]);
+
+  const userInfo = studentInfo();
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.profileContainer}>
+        {user.profileImage ? (
+          <Image
+            source={{ uri: user.profileImage }}
+            style={styles.profileImage}
+          />
+        ) : (
+          <View style={styles.profileImagePlaceholder}>
+            <Ionicons name="person" size={36} color={COLORS.gray400} />
+          </View>
+        )}
+
+        <View style={styles.profileInfo}>
+          <View style={styles.nameContainer}>
+            <Text style={styles.username}>{user.name}</Text>
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleText}>
+                {user.role === "TEACHER" ? "선생님" : "학생"}
+              </Text>
+            </View>
+          </View>
+          {userInfo && <Text style={styles.studentInfo}>{userInfo}</Text>}
+        </View>
+      </View>
+    </View>
+  );
+});
+
+const LogoutDialog = memo(
+  ({
+    visible,
+    onCancel,
+    onConfirm,
+  }: {
+    visible: boolean;
+    onCancel: () => void;
+    onConfirm: () => void;
+  }) => (
+    <Modal visible={visible} transparent={true} animationType="fade">
+      <Pressable style={styles.modalOverlay} onPress={onCancel}>
+        <View style={styles.dialogContainer}>
+          <Pressable
+            style={{ width: "100%" }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.dialog}>
+              <Text style={styles.dialogTitle}>로그아웃</Text>
+              <Text style={styles.dialogMessage}>
+                정말 로그아웃 하시겠습니까?
+              </Text>
+
+              <View style={styles.dialogActions}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={onCancel}
+                >
+                  <Text style={styles.cancelButtonText}>취소</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={onConfirm}
+                >
+                  <Text style={styles.confirmButtonText}>로그아웃</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </View>
+      </Pressable>
+    </Modal>
+  )
+);
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuthStore();
@@ -53,19 +202,9 @@ export default function ProfileScreen() {
     }
   }, [signOut]);
 
-  const toggleLogoutDialog = useCallback((visible: boolean) => {
-    setShowLogoutDialog(visible);
+  const handleMenuPress = useCallback((path: PathType) => {
+    router.push(path);
   }, []);
-
-  const formatStudentInfo = useCallback(() => {
-    if (!user) return null;
-    if (user.grade && user.room && user.number) {
-      return `${user.grade}학년 ${user.room}반 ${user.number}번`;
-    }
-    return null;
-  }, [user]);
-
-  const studentInfo = formatStudentInfo();
 
   if (!user) {
     return (
@@ -94,83 +233,19 @@ export default function ProfileScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <TouchableOpacity style={styles.card} activeOpacity={0.7}>
-              <View style={styles.profileContainer}>
-                {user.profileImage ? (
-                  <Image
-                    source={{ uri: user.profileImage }}
-                    style={styles.profileImage}
-                  />
-                ) : (
-                  <View style={styles.profileImagePlaceholder}>
-                    <Ionicons name="person" size={36} color={COLORS.gray400} />
-                  </View>
-                )}
+            <ProfileCard user={user} />
 
-                <View style={styles.profileInfo}>
-                  <View style={styles.nameContainer}>
-                    <Text style={styles.username}>{user.name}</Text>
-                    <View style={styles.roleBadge}>
-                      <Text style={styles.roleText}>
-                        {user.role === "TEACHER" ? "선생님" : "학생"}
-                      </Text>
-                    </View>
-                  </View>
-                  {studentInfo && (
-                    <Text style={styles.studentInfo}>{studentInfo}</Text>
-                  )}
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>지원</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.menuItem}
-                activeOpacity={0.7}
-                onPress={() => router.push("/help")}
-              >
-                <Text style={styles.menuText}>도움말</Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={COLORS.gray500}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.menuItem}
-                activeOpacity={0.7}
-                onPress={() => router.push("/service-info")}
-              >
-                <Text style={styles.menuText}>서비스 정보</Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={COLORS.gray500}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.menuItem}
-                activeOpacity={0.7}
-                onPress={() => router.push("/inquiry")}
-              >
-                <Text style={styles.menuText}>문의하기</Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={COLORS.gray500}
-                />
-              </TouchableOpacity>
-            </View>
+            {MENUS.map((group, index) => (
+              <MenuGroup
+                key={`group-${index}`}
+                group={group}
+                onPress={handleMenuPress}
+              />
+            ))}
 
             <TouchableOpacity
               style={styles.logoutButton}
-              onPress={() => toggleLogoutDialog(true)}
+              onPress={() => setShowLogoutDialog(true)}
               activeOpacity={0.7}
             >
               <Text style={styles.logoutText}>로그아웃</Text>
@@ -179,42 +254,11 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <Modal visible={showLogoutDialog} transparent={true} animationType="fade">
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => toggleLogoutDialog(false)}
-        >
-          <View style={styles.dialogContainer}>
-            <Pressable
-              style={{ width: "100%" }}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <View style={styles.dialog}>
-                <Text style={styles.dialogTitle}>로그아웃</Text>
-                <Text style={styles.dialogMessage}>
-                  정말 로그아웃 하시겠습니까?
-                </Text>
-
-                <View style={styles.dialogActions}>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => toggleLogoutDialog(false)}
-                  >
-                    <Text style={styles.cancelButtonText}>취소</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.confirmButton}
-                    onPress={handleLogout}
-                  >
-                    <Text style={styles.confirmButtonText}>로그아웃</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
+      <LogoutDialog
+        visible={showLogoutDialog}
+        onCancel={() => setShowLogoutDialog(false)}
+        onConfirm={handleLogout}
+      />
     </View>
   );
 }

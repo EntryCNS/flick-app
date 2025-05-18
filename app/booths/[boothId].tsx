@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -7,13 +7,18 @@ import {
   ScrollView,
   Image,
   Platform,
+  RefreshControl,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { StatusBar } from "expo-status-bar";
+import { MotiView } from "moti";
+
 import api from "@/libs/api";
 import { COLORS } from "@/constants/colors";
-import { StatusBar } from "expo-status-bar";
 import { Skeleton } from "@/components/Skeleton";
 
 const BACKGROUND_COLOR = "#F5F6F8";
@@ -35,9 +40,8 @@ interface Booth {
   products: Product[];
 }
 
-const BoothSkeleton = () => (
-  <View style={styles.contentWrapper}>
-    <View style={styles.bgExtender} />
+function BoothSkeleton() {
+  return (
     <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}
@@ -75,127 +79,184 @@ const BoothSkeleton = () => (
         </View>
       </View>
     </ScrollView>
-  </View>
-);
+  );
+}
+
+function ErrorContent({
+  message,
+  onBack,
+}: {
+  message: string;
+  onBack: () => void;
+}) {
+  return (
+    <MotiView
+      style={styles.errorContainer}
+      from={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "timing", duration: 300 }}
+    >
+      <Ionicons name="alert-circle-outline" size={64} color={COLORS.gray300} />
+      <Text style={styles.errorText}>{message}</Text>
+      <TouchableOpacity
+        style={styles.errorBackButton}
+        onPress={onBack}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.backButtonText}>돌아가기</Text>
+      </TouchableOpacity>
+    </MotiView>
+  );
+}
+
+function ProductItem({ product }: { product: Product }) {
+  return (
+    <MotiView
+      style={styles.productItem}
+      from={{ opacity: 0, translateY: 5 }}
+      animate={{ opacity: 1, translateY: 0 }}
+      transition={{ type: "timing", duration: 200 }}
+    >
+      <View style={styles.productImageContainer}>
+        {product.imageUrl ? (
+          <Image
+            source={{ uri: product.imageUrl }}
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.productImagePlaceholder}>
+            <Ionicons
+              name="fast-food-outline"
+              size={32}
+              color={COLORS.gray400}
+            />
+          </View>
+        )}
+        {product.isSoldOut && (
+          <View style={styles.soldOutOverlay}>
+            <Text style={styles.soldOutText}>품절</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.productContent}>
+        <Text style={styles.productName} numberOfLines={1}>
+          {product.name}
+        </Text>
+        {product.description && (
+          <Text style={styles.productDescription} numberOfLines={2}>
+            {product.description}
+          </Text>
+        )}
+        <Text style={styles.productPrice}>
+          {product.price.toLocaleString()}원
+        </Text>
+      </View>
+    </MotiView>
+  );
+}
 
 export default function BoothDetailScreen() {
   const { boothId } = useLocalSearchParams<{ boothId: string }>();
-  const [booth, setBooth] = useState<Booth | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  const fetchBoothDetail = useCallback(async () => {
-    if (!boothId) {
-      setError("부스 정보를 찾을 수 없습니다");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
+  const {
+    data: booth,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["booth", boothId],
+    queryFn: async () => {
+      if (!boothId) throw new Error("부스 정보를 찾을 수 없습니다");
       const { data } = await api.get<Booth>(`/booths/${boothId}`);
-      setBooth(data);
-      setError("");
-    } catch (err) {
-      setError("부스 정보를 불러오는데 실패했습니다");
-    } finally {
-      setLoading(false);
-    }
-  }, [boothId]);
+      return data;
+    },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+    retry: 1,
+  });
 
-  useEffect(() => {
-    fetchBoothDetail();
-  }, [fetchBoothDetail]);
+  const errorMessage =
+    error instanceof Error
+      ? error.message
+      : "부스 정보를 불러오는데 실패했습니다";
 
-  const renderErrorContent = useCallback(
-    (errorMessage: string) => (
-      <View style={styles.errorContainer}>
-        <Ionicons
-          name="alert-circle-outline"
-          size={64}
-          color={COLORS.gray300}
-        />
-        <Text style={styles.errorText}>{errorMessage}</Text>
-      </View>
-    ),
-    []
-  );
+  const handleBack = useCallback(() => router.back(), []);
 
-  const renderProductItem = useCallback(
-    (product: Product) => (
-      <View style={styles.productItem} key={product.id}>
-        <View style={styles.productImageContainer}>
-          {product.imageUrl ? (
-            <Image
-              source={{ uri: product.imageUrl }}
-              style={styles.productImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.productImagePlaceholder}>
-              <Ionicons
-                name="fast-food-outline"
-                size={32}
-                color={COLORS.gray400}
-              />
-            </View>
-          )}
-          {product.isSoldOut && (
-            <View style={styles.soldOutOverlay}>
-              <Text style={styles.soldOutText}>품절</Text>
-            </View>
-          )}
-        </View>
+  const handleRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
-        <View style={styles.productContent}>
-          <Text style={styles.productName} numberOfLines={1}>
-            {product.name}
-          </Text>
-          {product.description && (
-            <Text style={styles.productDescription} numberOfLines={2}>
-              {product.description}
-            </Text>
-          )}
-          <Text style={styles.productPrice}>
-            {product.price.toLocaleString()}원
-          </Text>
-        </View>
-      </View>
-    ),
-    []
-  );
+  const isPullToRefreshing = isFetching && !isLoading;
 
   return (
     <View style={styles.container}>
-      <View style={styles.statusBarFill} />
       <StatusBar style="dark" />
 
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-          >
-            <Ionicons name="chevron-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>부스 정보</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.fixedHeaderContainer}>
+        <View style={styles.statusBarFill} />
+        <SafeAreaView style={styles.safeArea} edges={["top"]}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBack}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>부스 정보</Text>
+            <View style={styles.rightButtonContainer}>
+              {!isLoading && !error && booth && (
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={handleRefresh}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name="refresh-outline"
+                    size={20}
+                    color={COLORS.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
+              {(isLoading || error || !booth) && (
+                <View style={styles.placeholderButton} />
+              )}
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
 
-      {loading ? (
-        <BoothSkeleton />
-      ) : error || !booth ? (
-        renderErrorContent(error || "부스 정보를 불러올 수 없습니다")
-      ) : (
-        <View style={styles.contentWrapper}>
-          <View style={styles.bgExtender} />
+      <View style={styles.contentWrapper}>
+        <View style={styles.bgExtender} />
+
+        {isLoading ? (
+          <BoothSkeleton />
+        ) : error || !booth ? (
+          <ErrorContent message={errorMessage} onBack={handleBack} />
+        ) : (
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isPullToRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={COLORS.primary500}
+                colors={[COLORS.primary500]}
+                progressBackgroundColor={COLORS.white}
+              />
+            }
           >
-            <View style={styles.boothImageContainer}>
+            <MotiView
+              style={styles.boothImageContainer}
+              from={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "timing", duration: 300 }}
+            >
               {booth.imageUrl ? (
                 <Image
                   source={{ uri: booth.imageUrl }}
@@ -211,9 +272,14 @@ export default function BoothDetailScreen() {
                   />
                 </View>
               )}
-            </View>
+            </MotiView>
 
-            <View style={styles.card}>
+            <MotiView
+              style={styles.card}
+              from={{ opacity: 0, translateY: 5 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ type: "timing", duration: 250, delay: 50 }}
+            >
               <View style={styles.boothHeader}>
                 <Text style={styles.boothName}>{booth.name}</Text>
                 {booth.description && (
@@ -222,30 +288,42 @@ export default function BoothDetailScreen() {
                   </Text>
                 )}
               </View>
-            </View>
+            </MotiView>
 
-            <View style={styles.card}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>메뉴</Text>
+            <MotiView
+              style={styles.card}
+              from={{ opacity: 0, translateY: 5 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ type: "timing", duration: 250, delay: 100 }}
+            >
+              <View style={styles.menuHeader}>
+                <Text style={styles.menuTitle}>메뉴</Text>
               </View>
               <View style={styles.productsList}>
                 {booth.products.length === 0 ? (
-                  <View style={styles.emptyContainer}>
+                  <MotiView
+                    style={styles.emptyContainer}
+                    from={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ type: "timing", duration: 250 }}
+                  >
                     <Ionicons
                       name="fast-food-outline"
                       size={48}
                       color={COLORS.gray300}
                     />
                     <Text style={styles.emptyText}>등록된 상품이 없습니다</Text>
-                  </View>
+                  </MotiView>
                 ) : (
-                  booth.products.map((product) => renderProductItem(product))
+                  booth.products.map((product) => (
+                    <ProductItem key={product.id} product={product} />
+                  ))
                 )}
               </View>
-            </View>
+            </MotiView>
           </ScrollView>
-        </View>
-      )}
+        )}
+      </View>
     </View>
   );
 }
@@ -255,6 +333,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
+  fixedHeaderContainer: {
+    width: "100%",
+    backgroundColor: COLORS.white,
+    zIndex: 10,
+  },
   statusBarFill: {
     position: "absolute",
     top: 0,
@@ -262,11 +345,11 @@ const styles = StyleSheet.create({
     right: 0,
     height: Platform.OS === "ios" ? 44 : 24,
     backgroundColor: COLORS.white,
-    zIndex: 1,
+    zIndex: 11,
   },
   safeArea: {
     backgroundColor: COLORS.white,
-    zIndex: 2,
+    zIndex: 12,
   },
   header: {
     flexDirection: "row",
@@ -278,17 +361,34 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.gray100,
   },
   headerTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     color: COLORS.text,
     marginLeft: 8,
     lineHeight: 24,
+    flex: 1,
+  },
+  rightButtonContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
   },
   backButton: {
     width: 24,
     height: 24,
     justifyContent: "center",
     alignItems: "center",
+  },
+  refreshButton: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  placeholderButton: {
+    width: 24,
+    height: 24,
   },
   contentWrapper: {
     flex: 1,
@@ -308,10 +408,10 @@ const styles = StyleSheet.create({
     backgroundColor: BACKGROUND_COLOR,
   },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
+    paddingHorizontal: 10,
+    paddingTop: 10,
     paddingBottom: 30,
-    gap: 14,
+    gap: 10,
   },
   boothImageContainer: {
     width: "100%",
@@ -339,39 +439,46 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0, 0, 0, 0.03)",
   },
   boothHeader: {
-    padding: 18,
+    padding: 16,
+    justifyContent: "center",
   },
   boothName: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 20,
-    fontWeight: "700",
     color: COLORS.text,
     marginBottom: 8,
   },
   boothDescription: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
     color: COLORS.textSecondary,
     lineHeight: 20,
   },
+  menuHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
   sectionHeader: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray100,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  menuTitle: {
+    fontFamily: "Pretendard-Bold",
+    fontSize: 20,
+    color: COLORS.text,
   },
   sectionTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
-    fontWeight: "600",
     color: COLORS.text,
   },
   productsList: {
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   productItem: {
     flexDirection: "row",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray50,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   productImageContainer: {
     width: 80,
@@ -402,9 +509,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   soldOutText: {
+    fontFamily: "Pretendard-Bold",
     color: COLORS.white,
     fontSize: 14,
-    fontWeight: "700",
   },
   productContent: {
     flex: 1,
@@ -412,20 +519,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   productName: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     color: COLORS.text,
     marginBottom: 4,
   },
   productDescription: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 13,
     color: COLORS.textSecondary,
     marginBottom: 8,
     lineHeight: 18,
   },
   productPrice: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 16,
-    fontWeight: "700",
     color: COLORS.primary600,
   },
   emptyContainer: {
@@ -441,16 +549,28 @@ const styles = StyleSheet.create({
     backgroundColor: BACKGROUND_COLOR,
   },
   emptyText: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 15,
     color: COLORS.gray500,
     marginTop: 12,
-    fontWeight: "500",
   },
   errorText: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 16,
     color: COLORS.gray500,
     textAlign: "center",
     marginTop: 16,
-    fontWeight: "500",
+    marginBottom: 24,
+  },
+  errorBackButton: {
+    backgroundColor: COLORS.primary600,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+  },
+  backButtonText: {
+    fontFamily: "Pretendard-SemiBold",
+    color: COLORS.white,
+    fontSize: 16,
   },
 });

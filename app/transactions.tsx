@@ -27,10 +27,10 @@ interface Transaction {
   id: number;
   type: "CHARGE" | "PAYMENT";
   amount: number;
-  booth: {
+  booth?: {
     name: string;
   };
-  product: {
+  product?: {
     name: string;
   };
   memo?: string;
@@ -232,10 +232,10 @@ export default function TransactionsScreen() {
             <View style={styles.transactionContent}>
               <View>
                 <Text style={styles.transactionTitle} numberOfLines={1}>
-                  {isCharge ? "포인트 충전" : item.product.name}
+                  {isCharge ? "포인트 충전" : item.product!.name}
                 </Text>
                 <Text style={styles.transactionSubtitle} numberOfLines={1}>
-                  {isCharge ? item.memo || "" : item.booth.name}
+                  {isCharge ? item.memo || "" : item.booth!.name}
                 </Text>
               </View>
 

@@ -2,19 +2,31 @@
   "expo": {
     "name": "Flick",
     "slug": "flick",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "flick",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "assetBundlePatterns": ["**/*"],
+    "notification": {
+      "icon": "./assets/images/notification.png",
+      "color": "#ffffff",
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} 개의 알림",
+      "iosDisplayInForeground": true
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.flick.core",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["fetch", "remote-notification"],
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification",
+          "fetch",
+          "remote-notification"
+        ],
         "NSCameraUsageDescription": "이 앱은 QR 코드 스캔을 위해 카메라 접근 권한이 필요합니다",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -33,22 +45,35 @@
             "NSExceptionMinimumTLSVersion": "TLSv1.2"
           }
         },
-        "LSApplicationQueriesSchemes": ["https", "http"],
+        "LSApplicationQueriesSchemes": ["https", "http", "https", "http"],
         "UIRequiresFullScreen": true,
         "UIStatusBarHidden": true,
         "UIStatusBarStyle": "UIStatusBarStyleDefault"
       },
       "requireFullScreen": true,
-      "buildNumber": "1.0.0"
+      "buildNumber": "1.0.1"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/android-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "useNextNotificationsApi": true,
+      "googleServicesFile": "./google-services.json",
       "package": "com.flick.core",
       "versionCode": 1,
-      "permissions": ["VIBRATE", "RECEIVE_BOOT_COMPLETED", "CAMERA"],
+      "permissions": [
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
       "softwareKeyboardLayoutMode": "pan",
       "edgeToEdgeEnabled": true
     },
@@ -109,7 +134,8 @@
     "updates": {
       "fallbackToCacheTimeout": 0,
       "enabled": true,
-      "checkAutomatically": "ON_LOAD"
+      "checkAutomatically": "ON_LOAD",
+      "url": "https://u.expo.dev/1d4f3888-6474-4e13-b335-08b1eaacc1a9"
     },
     "jsEngine": "hermes",
     "runtimeVersion": {

@@ -2,6 +2,7 @@ export enum NotificationType {
   PAYMENT_REQUEST = "PAYMENT_REQUEST",
   ORDER_COMPLETED = "ORDER_COMPLETED",
   POINT_CHARGED = "POINT_CHARGED",
+  NOTICE_CREATED = "NOTICE_CREATED",
   SYSTEM = "SYSTEM",
 }
 
@@ -25,6 +26,11 @@ export interface PointChargedPayload extends BaseNotificationPayload {
   type: NotificationType.POINT_CHARGED;
   amount: number;
   balanceAfter: number;
+}
+
+export interface NoticeCreatedPayload extends BaseNotificationPayload {
+  type: NotificationType.NOTICE_CREATED;
+  id: number;
 }
 
 export interface SystemNotificationPayload extends BaseNotificationPayload {

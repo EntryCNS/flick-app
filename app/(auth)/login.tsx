@@ -137,7 +137,9 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.statusBarFill} />
       <StatusBar style="dark" />
+
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <KeyboardAvoidingView
           style={styles.keyboardAvoidingView}
@@ -239,9 +241,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
+  statusBarFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === "ios" ? 44 : 24,
+    backgroundColor: COLORS.white,
+    zIndex: 1,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.white,
+    zIndex: 2,
   },
   keyboardAvoidingView: {
     flex: 1,

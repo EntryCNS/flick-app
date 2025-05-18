@@ -1,17 +1,24 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useCallback, memo, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   RefreshControl,
-  ListRenderItem,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { FlashList } from "@shopify/flash-list";
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+  FadeIn,
+} from "react-native-reanimated";
+import { MotiView } from "moti";
+
 import api from "@/libs/api";
 import { COLORS } from "@/constants/colors";
 import { StatusBar } from "expo-status-bar";
@@ -26,60 +33,91 @@ interface Notice {
 }
 
 const BACKGROUND_COLOR = "#F5F6F8";
+const AnimatedFlashList = Animated.createAnimatedComponent(FlashList<Notice>);
 
-const NoticeSkeletonLoader = () => (
-  <View style={styles.card}>
+const NoticeSkeletonLoader = memo(() => (
+  <MotiView
+    style={styles.card}
+    from={{ opacity: 0.6 }}
+    animate={{ opacity: 1 }}
+    transition={{ type: "timing", duration: 1000, loop: true }}
+  >
     <View style={styles.cardHeader}>
       <Skeleton width={80} height={12} />
     </View>
     <Skeleton width="90%" height={16} style={{ marginBottom: 8 }} />
     <Skeleton width="85%" height={14} style={{ marginBottom: 4 }} />
     <Skeleton width="70%" height={14} />
-  </View>
+  </MotiView>
+));
+
+const NoticeItem = memo(
+  ({
+    notice,
+    formatDate,
+    onPress,
+  }: {
+    notice: Notice;
+    formatDate: (date: string) => string;
+    onPress: (id: number) => void;
+  }) => (
+    <Animated.View entering={FadeIn.duration(300)}>
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.7}
+        onPress={() => onPress(notice.id)}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.dateText}>{formatDate(notice.createdAt)}</Text>
+          {notice.isPinned && (
+            <View style={styles.pinnedBadge}>
+              <Text style={styles.pinnedText}>고정</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.noticeTitle} numberOfLines={2}>
+          {notice.title}
+        </Text>
+        <Text style={styles.noticeContent} numberOfLines={2}>
+          {notice.content}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  )
 );
 
+const EmptyNoticeList = memo(() => (
+  <Animated.View style={styles.emptyContainer} entering={FadeIn.duration(400)}>
+    <Ionicons name="notifications-outline" size={64} color={COLORS.gray300} />
+    <Text style={styles.emptyText}>등록된 공지사항이 없습니다</Text>
+  </Animated.View>
+));
+
 export default function NoticesScreen() {
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const scrollY = useSharedValue(0);
+  const flashListRef = useRef(null);
 
-  const fetchNotices = useCallback(async (shouldRefresh = false) => {
-    try {
-      if (shouldRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      const { data } = await api.get<Notice[]>("/notices");
-
-      const sortedNotices = [...data].sort((a, b) => {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      });
-
-      setNotices(sortedNotices);
-    } catch (error) {
-      console.error("공지사항 조회 실패:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  const fetchNotices = useCallback(async (): Promise<Notice[]> => {
+    const { data } = await api.get<Notice[]>("/notices");
+    return data.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   }, []);
 
-  useEffect(() => {
-    fetchNotices();
-  }, [fetchNotices]);
+  const {
+    data: notices = [],
+    isLoading,
+    isFetching,
+    refetch,
+  } = useQuery({
+    queryKey: ["notices"],
+    queryFn: fetchNotices,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const handleRefresh = useCallback(() => {
-    fetchNotices(true);
-  }, [fetchNotices]);
-
-  const formatDate = useCallback((dateString: string) => {
+  const formatDate = useCallback((dateString: string): string => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return "";
@@ -88,79 +126,56 @@ export default function NoticesScreen() {
         2,
         "0"
       )}.${String(date.getDate()).padStart(2, "0")}`;
-    } catch (error) {
+    } catch {
       return dateString;
     }
   }, []);
 
-  const renderNoticeItem: ListRenderItem<Notice> = useCallback(
-    ({ item }) => (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.7}
-        onPress={() => router.push(`/notices/${item.id}`)}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.dateText}>{formatDate(item.createdAt)}</Text>
-          {item.isPinned && (
-            <View style={styles.pinnedBadge}>
-              <Text style={styles.pinnedText}>고정</Text>
-            </View>
-          )}
-        </View>
+  const handleNoticePress = useCallback((id: number): void => {
+    router.push(`/notices/${id}`);
+  }, []);
 
-        <Text style={styles.noticeTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
 
-        <Text style={styles.noticeContent} numberOfLines={2}>
-          {item.content}
-        </Text>
-      </TouchableOpacity>
-    ),
-    [formatDate]
-  );
-
-  const renderEmpty = useCallback(() => {
-    if (loading) return null;
-
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons
-          name="notifications-outline"
-          size={64}
-          color={COLORS.gray300}
-        />
-        <Text style={styles.emptyText}>등록된 공지사항이 없습니다</Text>
-      </View>
-    );
-  }, [loading]);
-
-  const renderSkeletonList = () => (
-    <FlatList
-      data={Array.from({ length: 5 }, (_, i) => i)}
-      renderItem={() => <NoticeSkeletonLoader />}
-      keyExtractor={(_, index) => `skeleton-${index}`}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-    />
-  );
-
-  const keyExtractor = useCallback((item: Notice) => item.id.toString(), []);
-
-  const memoizedRefreshControl = useMemo(
-    () => (
-      <RefreshControl
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        tintColor={COLORS.primary500}
-        colors={[COLORS.primary500]}
-        progressBackgroundColor={COLORS.white}
+  const renderNoticeItem = useCallback(
+    ({ item }: { item: Notice; index: number }) => (
+      <NoticeItem
+        notice={item}
+        formatDate={formatDate}
+        onPress={handleNoticePress}
       />
     ),
-    [refreshing, handleRefresh]
+    [formatDate, handleNoticePress]
   );
+
+  const keyExtractor = useCallback(
+    (item: Notice): string => `notice-${item.id}`,
+    []
+  );
+
+  const itemSeparator = useCallback(() => <View style={{ height: 10 }} />, []);
+
+  const renderSkeletonList = useCallback(
+    () => (
+      <FlashList<number>
+        data={Array.from({ length: 5 }, (_, i) => i)}
+        renderItem={() => <NoticeSkeletonLoader />}
+        keyExtractor={(_, index) => `skeleton-${index}`}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        estimatedItemSize={150}
+        ItemSeparatorComponent={itemSeparator}
+      />
+    ),
+    [itemSeparator]
+  );
+
+  const isInitialLoading = isLoading && !isFetching;
+  const isRefreshing = isFetching && !isLoading;
 
   return (
     <View style={styles.container}>
@@ -176,18 +191,29 @@ export default function NoticesScreen() {
       <View style={styles.contentWrapper}>
         <View style={styles.bgExtender} />
         <View style={styles.contentContainer}>
-          {loading && !refreshing ? (
+          {isInitialLoading ? (
             renderSkeletonList()
           ) : (
-            <FlatList
+            <AnimatedFlashList
+              ref={flashListRef}
               data={notices}
               renderItem={renderNoticeItem}
               keyExtractor={keyExtractor}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
-              refreshControl={memoizedRefreshControl}
-              ListEmptyComponent={renderEmpty}
-              ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+              estimatedItemSize={150}
+              onScroll={scrollHandler}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={refetch}
+                  tintColor={COLORS.primary500}
+                  colors={[COLORS.primary500]}
+                  progressBackgroundColor={COLORS.white}
+                />
+              }
+              ListEmptyComponent={isLoading ? null : <EmptyNoticeList />}
+              ItemSeparatorComponent={itemSeparator}
             />
           )}
         </View>

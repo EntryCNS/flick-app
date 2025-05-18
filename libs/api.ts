@@ -28,7 +28,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    console.log(JSON.stringify(error.response));
+    console.log(error.response);
 
     if (
       error instanceof AxiosError &&

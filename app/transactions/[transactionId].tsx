@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, memo } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -10,12 +10,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { StatusBar } from "expo-status-bar";
+import { MotiView } from "moti";
+import dayjs from "dayjs";
+import "dayjs/locale/ko";
+
 import api from "@/libs/api";
 import { COLORS } from "@/constants/colors";
-import { StatusBar } from "expo-status-bar";
-import dayjs from "dayjs";
 import { Skeleton } from "@/components/Skeleton";
-import "dayjs/locale/ko";
 
 dayjs.locale("ko");
 
@@ -51,273 +54,43 @@ interface TransactionDetail {
   items?: OrderItem[];
 }
 
-interface AmountCardSkeletonProps {}
-const AmountCardSkeleton = memo<AmountCardSkeletonProps>(() => (
-  <View style={styles.amountCard}>
-    <View style={styles.transactionTypeContainer}>
-      <View
-        style={[styles.transactionIcon, { backgroundColor: COLORS.gray100 }]}
-      >
-        <Skeleton width={24} height={24} borderRadius={12} />
-      </View>
-      <Skeleton width={100} height={14} />
-    </View>
-    <Skeleton width={180} height={34} style={{ marginVertical: 5 }} />
-  </View>
-));
-
-interface InfoItemSkeletonProps {}
-const InfoItemSkeleton = memo<InfoItemSkeletonProps>(() => (
-  <View style={styles.infoItem}>
-    <Skeleton width={80} height={14} />
-    <Skeleton width={120} height={14} />
-  </View>
-));
-
-interface ProductItemSkeletonProps {}
-const ProductItemSkeleton = memo<ProductItemSkeletonProps>(() => (
-  <View style={[styles.productItem, styles.productItemWithBorder]}>
-    <View style={styles.productInfo}>
-      <Skeleton width={120} height={14} style={{ marginBottom: 5 }} />
-      <Skeleton width={80} height={13} />
-    </View>
-    <Skeleton width={70} height={14} />
-  </View>
-));
-
-export default function TransactionDetailScreen() {
+function TransactionDetailScreen() {
   const { transactionId } = useLocalSearchParams<{ transactionId: string }>();
-  const [transaction, setTransaction] = useState<TransactionDetail | null>(
-    null
-  );
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
 
-  const fetchTransactionDetail = useCallback(async () => {
-    if (!transactionId) {
-      setError("거래 정보를 찾을 수 없습니다");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
+  const {
+    data: transaction,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["transaction", transactionId],
+    queryFn: async () => {
+      if (!transactionId) throw new Error("거래 정보를 찾을 수 없습니다");
       const { data } = await api.get<TransactionDetail>(
         `/transactions/${transactionId}`
       );
-      setTransaction(data);
-      setError("");
-    } catch (err) {
-      setError("거래 정보를 불러오는데 실패했습니다");
-    } finally {
-      setLoading(false);
-    }
-  }, [transactionId]);
+      return data;
+    },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+    retry: 1,
+  });
 
-  useEffect(() => {
-    fetchTransactionDetail();
-  }, [fetchTransactionDetail]);
+  const errorMessage =
+    error instanceof Error
+      ? error.message
+      : "거래 정보를 불러오는데 실패했습니다";
 
-  const formatDate = useCallback((dateString: string): string => {
+  const formatDate = (dateString: string): string => {
     return dayjs(dateString).format("YYYY년 M월 D일 HH:mm");
-  }, []);
+  };
 
-  const formatAmount = useCallback(
-    (amount: number, type: TransactionType): string => {
-      const formattedNum = Math.abs(amount).toLocaleString("ko-KR");
-      return type === "CHARGE" ? `+${formattedNum}` : `-${formattedNum}`;
-    },
-    []
-  );
+  const formatAmount = (amount: number, type: TransactionType): string => {
+    const formattedNum = Math.abs(amount).toLocaleString("ko-KR");
+    return type === "CHARGE" ? `+${formattedNum}` : `-${formattedNum}`;
+  };
 
-  const renderSkeletonContent = useCallback(
-    () => (
-      <View style={styles.contentWrapper}>
-        <View style={styles.bgExtender} />
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <AmountCardSkeleton />
-
-          <View style={styles.card}>
-            <View style={styles.sectionHeader}>
-              <Skeleton width={100} height={15} />
-            </View>
-            <InfoItemSkeleton />
-            <InfoItemSkeleton />
-            <InfoItemSkeleton />
-            <InfoItemSkeleton />
-          </View>
-
-          <View style={styles.card}>
-            <View style={styles.sectionHeader}>
-              <Skeleton width={100} height={15} />
-            </View>
-            <ProductItemSkeleton />
-            <ProductItemSkeleton />
-
-            <View style={styles.totalSection}>
-              <Skeleton width={80} height={14} />
-              <Skeleton width={100} height={16} />
-            </View>
-          </View>
-        </ScrollView>
-      </View>
-    ),
-    []
-  );
-
-  const renderErrorContent = useCallback(
-    (errorMessage: string) => (
-      <View style={styles.errorContainer}>
-        <Ionicons
-          name="alert-circle-outline"
-          size={64}
-          color={COLORS.gray300}
-        />
-        <Text style={styles.errorText}>{errorMessage}</Text>
-      </View>
-    ),
-    []
-  );
-
-  const renderTransactionContent = useCallback(
-    (transactionData: TransactionDetail) => {
-      const isCharge = transactionData.type === "CHARGE";
-
-      return (
-        <View style={styles.contentWrapper}>
-          <View style={styles.bgExtender} />
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.amountCard}>
-              <View style={styles.transactionTypeContainer}>
-                <View
-                  style={[
-                    styles.transactionIcon,
-                    {
-                      backgroundColor: isCharge
-                        ? COLORS.success50
-                        : COLORS.primary50,
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name={isCharge ? "wallet-outline" : "cart-outline"}
-                    size={24}
-                    color={isCharge ? COLORS.success600 : COLORS.primary600}
-                  />
-                </View>
-                <Text style={styles.transactionType}>
-                  {isCharge
-                    ? "포인트 충전"
-                    : transactionData.booth?.name || "결제"}
-                </Text>
-              </View>
-
-              <Text
-                style={[
-                  styles.amount,
-                  isCharge ? styles.amountPositive : styles.amountNegative,
-                ]}
-              >
-                {formatAmount(transactionData.amount, transactionData.type)}
-                <Text style={styles.wonText}>원</Text>
-              </Text>
-            </View>
-
-            <View style={styles.card}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>거래 정보</Text>
-              </View>
-
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>거래 번호</Text>
-                <Text style={styles.infoValue}>#{transactionData.id}</Text>
-              </View>
-
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>거래 유형</Text>
-                <Text style={styles.infoValue}>
-                  {isCharge ? "포인트 충전" : "결제"}
-                </Text>
-              </View>
-
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>거래 일시</Text>
-                <Text style={styles.infoValue}>
-                  {formatDate(transactionData.createdAt)}
-                </Text>
-              </View>
-
-              {!isCharge && transactionData.booth && (
-                <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>부스</Text>
-                  <Text style={styles.infoValue}>
-                    {transactionData.booth.name}
-                  </Text>
-                </View>
-              )}
-
-              {isCharge && transactionData.memo && (
-                <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>메모</Text>
-                  <Text style={styles.infoValue}>{transactionData.memo}</Text>
-                </View>
-              )}
-            </View>
-
-            {!isCharge &&
-              transactionData.items &&
-              transactionData.items.length > 0 && (
-                <View style={styles.card}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>상품 정보</Text>
-                  </View>
-
-                  {transactionData.items.map((item, index) => (
-                    <View
-                      key={item.id || index}
-                      style={[
-                        styles.productItem,
-                        index < transactionData.items!.length - 1 &&
-                          styles.productItemWithBorder,
-                      ]}
-                    >
-                      <View style={styles.productInfo}>
-                        <Text style={styles.productName}>
-                          {item.product.name}
-                        </Text>
-                        <Text style={styles.productPrice}>
-                          {item.price.toLocaleString()}원
-                          {item.quantity > 1 ? ` × ${item.quantity}개` : ""}
-                        </Text>
-                      </View>
-                      <Text style={styles.productTotal}>
-                        {(item.price * item.quantity).toLocaleString()}원
-                      </Text>
-                    </View>
-                  ))}
-
-                  <View style={styles.totalSection}>
-                    <Text style={styles.totalLabel}>총 결제금액</Text>
-                    <Text style={styles.totalAmount}>
-                      {transactionData.amount.toLocaleString()}원
-                    </Text>
-                  </View>
-                </View>
-              )}
-          </ScrollView>
-        </View>
-      );
-    },
-    [formatAmount, formatDate]
-  );
+  const isCharge = transaction?.type === "CHARGE";
 
   return (
     <View style={styles.container}>
@@ -329,19 +102,241 @@ export default function TransactionDetailScreen() {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
-            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="chevron-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>상세내역</Text>
+          <Text style={styles.headerTitle}>거래 내역</Text>
+
+          {!isLoading && !error && (
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={() => refetch()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="refresh-outline"
+                size={20}
+                color={COLORS.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
 
-      {loading
-        ? renderSkeletonContent()
-        : error || !transaction
-        ? renderErrorContent(error || "거래 정보를 불러올 수 없습니다")
-        : renderTransactionContent(transaction)}
+      <View style={styles.contentWrapper}>
+        <View style={styles.bgExtender} />
+
+        {isLoading ? (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.skeletonAmountCard}>
+              <View style={styles.skeletonAmountContent}>
+                <Skeleton
+                  width={120}
+                  height={18}
+                  style={{ marginBottom: 10 }}
+                />
+                <Skeleton width={180} height={36} style={{ marginBottom: 8 }} />
+                <Skeleton width={100} height={12} />
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.sectionHeader}>
+                <Skeleton width={80} height={16} />
+              </View>
+              <View style={styles.infoGroup}>
+                {[...Array(4)].map((_, i) => (
+                  <View key={`info-${i}`} style={styles.infoItem}>
+                    <Skeleton width={70} height={14} />
+                    <Skeleton width={120} height={14} />
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.sectionHeader}>
+                <Skeleton width={80} height={16} />
+              </View>
+              {[...Array(2)].map((_, i) => (
+                <View
+                  key={`product-${i}`}
+                  style={[
+                    styles.productItem,
+                    i < 1 && styles.productItemBorder,
+                  ]}
+                >
+                  <View style={styles.productInfo}>
+                    <Skeleton
+                      width={120}
+                      height={16}
+                      style={{ marginBottom: 4 }}
+                    />
+                    <Skeleton width={80} height={14} />
+                  </View>
+                  <Skeleton width={70} height={16} />
+                </View>
+              ))}
+              <View style={styles.totalSection}>
+                <Skeleton width={80} height={16} />
+                <Skeleton width={90} height={18} />
+              </View>
+            </View>
+          </ScrollView>
+        ) : error || !transaction ? (
+          <View style={styles.errorContainer}>
+            <MotiView
+              from={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "timing", duration: 300 }}
+            >
+              <Ionicons
+                name="alert-circle-outline"
+                size={64}
+                color={COLORS.gray300}
+              />
+              <Text style={styles.errorText}>{errorMessage}</Text>
+              <TouchableOpacity
+                style={styles.errorButton}
+                onPress={() => router.back()}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.errorButtonText}>돌아가기</Text>
+              </TouchableOpacity>
+            </MotiView>
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <MotiView
+              style={styles.amountCard}
+              from={{ opacity: 0, translateY: 5 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ type: "timing", duration: 300 }}
+            >
+              <View style={styles.amountCardHeader}>
+                <View style={styles.amountCardHeaderLeft}>
+                  <View
+                    style={[
+                      styles.transactionTypeIcon,
+                      {
+                        backgroundColor: isCharge
+                          ? COLORS.success50
+                          : COLORS.primary50,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={isCharge ? "wallet-outline" : "cart-outline"}
+                      size={20}
+                      color={isCharge ? COLORS.success600 : COLORS.primary600}
+                    />
+                  </View>
+                  <Text style={styles.transactionTypeText}>
+                    {isCharge ? "포인트 충전" : "결제"}
+                  </Text>
+                </View>
+                <Text style={styles.dateText}>
+                  {formatDate(transaction.createdAt)}
+                </Text>
+              </View>
+
+              <View style={styles.amountContainer}>
+                <Text
+                  style={[
+                    styles.amountText,
+                    isCharge ? styles.amountPositive : styles.amountNegative,
+                  ]}
+                >
+                  {formatAmount(transaction.amount, transaction.type)}
+                  <Text style={styles.wonText}>원</Text>
+                </Text>
+
+                {!isCharge && transaction.booth && (
+                  <Text style={styles.boothName}>{transaction.booth.name}</Text>
+                )}
+              </View>
+            </MotiView>
+
+            <MotiView
+              style={styles.card}
+              from={{ opacity: 0, translateY: 5 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ type: "timing", duration: 300, delay: 100 }}
+            >
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>거래 정보</Text>
+              </View>
+
+              <View style={styles.infoGroup}>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>거래 번호</Text>
+                  <Text style={styles.infoValue}>#{transaction.id}</Text>
+                </View>
+
+                {isCharge && transaction.memo && (
+                  <View style={styles.infoItem}>
+                    <Text style={styles.infoLabel}>메모</Text>
+                    <Text style={styles.infoValue}>{transaction.memo}</Text>
+                  </View>
+                )}
+              </View>
+            </MotiView>
+
+            {!isCharge && transaction.items && transaction.items.length > 0 && (
+              <MotiView
+                style={styles.card}
+                from={{ opacity: 0, translateY: 5 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: "timing", duration: 300, delay: 150 }}
+              >
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>상품 정보</Text>
+                </View>
+
+                {transaction.items.map((item, index) => (
+                  <View
+                    key={item.id || index}
+                    style={[
+                      styles.productItem,
+                      index < transaction.items!.length - 1 &&
+                        styles.productItemBorder,
+                    ]}
+                  >
+                    <View style={styles.productInfo}>
+                      <Text style={styles.productName}>
+                        {item.product.name}
+                      </Text>
+                      <Text style={styles.productQuantity}>
+                        {item.price.toLocaleString()}원
+                        {item.quantity > 1 ? ` × ${item.quantity}개` : ""}
+                      </Text>
+                    </View>
+                    <Text style={styles.productTotal}>
+                      {(item.price * item.quantity).toLocaleString()}원
+                    </Text>
+                  </View>
+                ))}
+
+                <View style={styles.totalSection}>
+                  <Text style={styles.totalLabel}>총 결제금액</Text>
+                  <Text style={styles.totalAmount}>
+                    {transaction.amount.toLocaleString()}원
+                  </Text>
+                </View>
+              </MotiView>
+            )}
+          </ScrollView>
+        )}
+      </View>
     </View>
   );
 }
@@ -374,13 +369,19 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.gray100,
   },
   headerTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     color: COLORS.text,
-    lineHeight: 24,
+    flex: 1,
     marginLeft: 8,
   },
   backButton: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  refreshButton: {
     width: 24,
     height: 24,
     justifyContent: "center",
@@ -404,41 +405,62 @@ const styles = StyleSheet.create({
     backgroundColor: BACKGROUND_COLOR,
   },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 20,
-    gap: 12,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 30,
+    gap: 10,
   },
   amountCard: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
     overflow: "hidden",
-    padding: 20,
-    alignItems: "center",
+    padding: 16,
   },
-  transactionTypeContainer: {
+  skeletonAmountCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    overflow: "hidden",
+    padding: 16,
+  },
+  skeletonAmountContent: {
+    alignItems: "center",
+    width: "100%",
+  },
+  amountCardHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
   },
-  transactionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+  amountCardHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  transactionTypeIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: 8,
   },
-  transactionType: {
+  transactionTypeText: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 14,
-    fontWeight: "600",
     color: COLORS.text,
-    lineHeight: 19,
   },
-  amount: {
+  dateText: {
+    fontFamily: "Pretendard-Medium",
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  amountContainer: {
+    alignItems: "center",
+  },
+  amountText: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 28,
-    fontWeight: "600",
-    lineHeight: 34,
+    marginBottom: 4,
   },
   amountPositive: {
     color: COLORS.success600,
@@ -447,8 +469,14 @@ const styles = StyleSheet.create({
     color: COLORS.danger600,
   },
   wonText: {
-    fontSize: 20,
-    fontWeight: "500",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 22,
+  },
+  boothName: {
+    fontFamily: "Pretendard-Medium",
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 4,
   },
   card: {
     backgroundColor: COLORS.white,
@@ -456,34 +484,35 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   sectionHeader: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
   },
   sectionTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     color: COLORS.text,
-    lineHeight: 19,
+  },
+  infoGroup: {
+    paddingVertical: 6,
   },
   infoItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray50,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   infoLabel: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
     color: COLORS.textSecondary,
-    lineHeight: 18,
   },
   infoValue: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 14,
-    fontWeight: "500",
     color: COLORS.text,
-    lineHeight: 18,
     textAlign: "right",
     maxWidth: "65%",
   },
@@ -491,10 +520,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  productItemWithBorder: {
+  productItemBorder: {
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray50,
   },
@@ -503,44 +532,40 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   productName: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 14,
-    fontWeight: "600",
     color: COLORS.text,
-    lineHeight: 19,
     marginBottom: 4,
   },
-  productPrice: {
+  productQuantity: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 13,
     color: COLORS.textSecondary,
-    lineHeight: 16,
   },
   productTotal: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 14,
-    fontWeight: "600",
     color: COLORS.text,
-    lineHeight: 19,
   },
   totalSection: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderTopWidth: 1,
     borderTopColor: COLORS.gray100,
     backgroundColor: COLORS.gray50,
   },
   totalLabel: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 14,
-    fontWeight: "600",
     color: COLORS.text,
-    lineHeight: 19,
   },
   totalAmount: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 16,
-    fontWeight: "700",
     color: COLORS.primary600,
-    lineHeight: 20,
   },
   errorContainer: {
     flex: 1,
@@ -549,11 +574,24 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 16,
     color: COLORS.gray500,
     textAlign: "center",
     marginTop: 16,
-    fontWeight: "500",
-    lineHeight: 20,
+    marginBottom: 24,
+  },
+  errorButton: {
+    backgroundColor: COLORS.primary600,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+  },
+  errorButtonText: {
+    fontFamily: "Pretendard-SemiBold",
+    color: COLORS.white,
+    fontSize: 16,
   },
 });
+
+export default TransactionDetailScreen;

@@ -6,9 +6,19 @@ import Constants from "expo-constants";
 import api from "@/libs/api";
 import { router } from "expo-router";
 import { NotificationType } from "@/types/notification";
+import { useBalanceStore } from "@/stores/balance";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 interface NotificationState {
-  expoPushToken: string | null;
+  pushToken: string | null;
   isInitialized: boolean;
 }
 
@@ -24,11 +34,61 @@ export const useNotificationStore = create<
 >()((set, get) => {
   let initializing = false;
 
+  const setupNotificationChannels = async () => {
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "기본",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#FF231F7C",
+      });
+
+      await Notifications.setNotificationChannelAsync("payments", {
+        name: "결제 알림",
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#4D96FF",
+      });
+
+      await Notifications.setNotificationChannelAsync("orders", {
+        name: "주문 알림",
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#4CAF50",
+      });
+
+      await Notifications.setNotificationChannelAsync("points", {
+        name: "포인트 알림",
+        importance: Notifications.AndroidImportance.DEFAULT,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#FFC107",
+      });
+
+      await Notifications.setNotificationChannelAsync("notices", {
+        name: "공지사항 알림",
+        importance: Notifications.AndroidImportance.DEFAULT,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#9C27B0",
+      });
+    }
+  };
+
+  const updateBalanceIfNeeded = (type: NotificationType) => {
+    if (
+      type === NotificationType.PAYMENT_REQUEST ||
+      type === NotificationType.ORDER_COMPLETED ||
+      type === NotificationType.POINT_CHARGED
+    ) {
+      const { refreshBalance } = useBalanceStore.getState();
+      refreshBalance();
+    }
+  };
+
   return {
-    expoPushToken: null,
+    pushToken: null,
     isInitialized: false,
 
-    initialize: async (): Promise<void> => {
+    initialize: async () => {
       if (initializing || get().isInitialized) return;
       initializing = true;
 
@@ -38,35 +98,7 @@ export const useNotificationStore = create<
       }
 
       try {
-        if (Platform.OS === "android") {
-          await Notifications.setNotificationChannelAsync("default", {
-            name: "기본",
-            importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: "#FF231F7C",
-          });
-
-          await Notifications.setNotificationChannelAsync("payments", {
-            name: "결제 알림",
-            importance: Notifications.AndroidImportance.HIGH,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: "#4D96FF",
-          });
-
-          await Notifications.setNotificationChannelAsync("orders", {
-            name: "주문 알림",
-            importance: Notifications.AndroidImportance.HIGH,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: "#4CAF50",
-          });
-
-          await Notifications.setNotificationChannelAsync("points", {
-            name: "포인트 알림",
-            importance: Notifications.AndroidImportance.DEFAULT,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: "#FFC107",
-          });
-        }
+        await setupNotificationChannels();
 
         const { status: existingStatus } =
           await Notifications.getPermissionsAsync();
@@ -83,12 +115,11 @@ export const useNotificationStore = create<
         }
 
         const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-
         const { data: token } = await Notifications.getExpoPushTokenAsync({
           projectId,
         });
 
-        set({ expoPushToken: token, isInitialized: true });
+        set({ pushToken: token, isInitialized: true });
       } catch (error) {
         console.error("푸시 토큰 가져오기 실패", error);
       } finally {
@@ -96,8 +127,8 @@ export const useNotificationStore = create<
       }
     },
 
-    registerToken: async (): Promise<void> => {
-      const token = get().expoPushToken;
+    registerToken: async () => {
+      const token = get().pushToken;
       if (!token) return;
 
       try {
@@ -109,13 +140,10 @@ export const useNotificationStore = create<
       }
     },
 
-    unregisterToken: async (): Promise<void> => {
-      const token = get().expoPushToken;
-      if (!token) return;
-
+    unregisterToken: async () => {
       try {
         await api.delete("/users/me/push-token");
-        set({ expoPushToken: null });
+        set({ pushToken: null });
       } catch (error) {
         console.error("푸시 토큰 등록 해제 실패", error);
       }
@@ -123,8 +151,15 @@ export const useNotificationStore = create<
 
     listenForNotifications: (): (() => void) => {
       const notificationReceivedListener =
-        Notifications.addNotificationReceivedListener(() => {
-          // 수신된 알림 처리
+        Notifications.addNotificationReceivedListener((notification) => {
+          try {
+            const data = notification.request.content.data;
+            const type = data.type as NotificationType;
+
+            updateBalanceIfNeeded(type);
+          } catch (error) {
+            console.error("알림 처리 실패", error);
+          }
         });
 
       const responseReceivedListener =
@@ -132,6 +167,8 @@ export const useNotificationStore = create<
           try {
             const data = response.notification.request.content.data;
             const type = data.type as NotificationType;
+
+            updateBalanceIfNeeded(type);
 
             switch (type) {
               case NotificationType.PAYMENT_REQUEST:
@@ -151,6 +188,10 @@ export const useNotificationStore = create<
                 router.navigate("/(tabs)");
                 break;
 
+              case NotificationType.NOTICE_CREATED:
+                router.navigate("/notices");
+                break;
+
               default:
                 break;
             }
@@ -159,7 +200,7 @@ export const useNotificationStore = create<
           }
         });
 
-      return (): void => {
+      return () => {
         notificationReceivedListener.remove();
         responseReceivedListener.remove();
       };

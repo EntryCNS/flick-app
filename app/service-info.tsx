@@ -38,7 +38,7 @@ export default function ServiceInfoScreen() {
     {
       title: "앱 정보",
       items: [
-        { label: "앱 버전", value: "1.0.0" },
+        { label: "앱 버전", value: "1.0.1" },
         { label: "업데이트 날짜", value: "2025.05.14" },
         { label: "최소 요구 사항", value: "iOS 13.0 / Android 8.0 이상" },
       ],

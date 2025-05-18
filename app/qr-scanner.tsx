@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Animated,
   Linking,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -55,15 +56,19 @@ export default function QRScannerScreen() {
 
   if (!permission) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-        <StatusBar style="dark" backgroundColor={COLORS.white} animated />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary500} />
-          <Text style={styles.loadingText}>
-            카메라 권한을 확인하는 중입니다...
-          </Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <View style={styles.statusBarFill} />
+        <StatusBar style="dark" animated />
+
+        <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary500} />
+            <Text style={styles.loadingText}>
+              카메라 권한을 확인하는 중입니다...
+            </Text>
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
@@ -71,43 +76,42 @@ export default function QRScannerScreen() {
     const isBlocked = permission && !permission.canAskAgain;
 
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-        <StatusBar style="dark" backgroundColor={COLORS.white} animated />
-        <View style={styles.permissionContainer}>
-          <Text style={styles.title}>
-            결제 QR 코드 스캔을 위해{"\n"}카메라 접근 권한이 필요합니다
-          </Text>
+      <View style={styles.container}>
+        <View style={styles.statusBarFill} />
+        <StatusBar style="dark" animated />
 
-          {isBlocked ? (
-            <TouchableOpacity
-              style={styles.button}
-              onPress={Linking.openSettings}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.buttonText}>설정으로 이동</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.button}
-              onPress={requestPermission}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.buttonText}>권한 허용하기</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </SafeAreaView>
+        <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+          <View style={styles.permissionContainer}>
+            <Text style={styles.title}>
+              결제 QR 코드 스캔을 위해{"\n"}카메라 접근 권한이 필요합니다
+            </Text>
+
+            {isBlocked ? (
+              <TouchableOpacity
+                style={styles.button}
+                onPress={Linking.openSettings}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.buttonText}>설정으로 이동</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.button}
+                onPress={requestPermission}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.buttonText}>권한 허용하기</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <StatusBar
-        style="light"
-        backgroundColor="transparent"
-        translucent
-        animated
-      />
+      <StatusBar style="light" translucent animated />
       <View style={styles.cameraContainer}>
         <CameraView
           style={styles.camera}
@@ -212,6 +216,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
+  },
+  statusBarFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === "ios" ? 44 : 24,
+    backgroundColor: COLORS.white,
+    zIndex: 1,
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    zIndex: 2,
   },
   loadingContainer: {
     flex: 1,

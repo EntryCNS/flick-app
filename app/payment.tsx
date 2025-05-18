@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useRef,
-  useCallback,
-  useEffect,
-  useMemo,
-} from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,9 +6,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  Modal,
-  Animated,
-  PanResponder,
   Dimensions,
   Platform,
 } from "react-native";
@@ -23,22 +14,323 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/colors";
 import { usePaymentStore } from "@/stores/payment";
+import { useBalanceStore } from "@/stores/balance";
 import api from "@/libs/api";
 import { StatusBar } from "expo-status-bar";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  runOnJS,
+  interpolate,
+  Extrapolation,
+} from "react-native-reanimated";
+import { MotiView } from "moti";
 
 const BACKGROUND_COLOR = "#F5F6F8";
 const SLIDER_THUMB_SIZE = 52;
+
+interface AlertProps {
+  visible: boolean;
+  isSuccess: boolean;
+  message: string;
+  onClose: () => void;
+}
+
+function PaymentAlert({ visible, isSuccess, message, onClose }: AlertProps) {
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      opacity.value = withTiming(1, { duration: 300 });
+    } else {
+      opacity.value = withTiming(0, { duration: 200 });
+    }
+  }, [visible, opacity]);
+
+  const overlayStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+    };
+  });
+
+  const containerStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          scale: interpolate(
+            opacity.value,
+            [0, 1],
+            [0.9, 1],
+            Extrapolation.CLAMP
+          ),
+        },
+      ],
+    };
+  });
+
+  if (!visible) return null;
+
+  return (
+    <View style={styles.modalContainer}>
+      <Animated.View style={[styles.alertOverlay, overlayStyle]}>
+        <Animated.View style={[styles.alertContainer, containerStyle]}>
+          <View
+            style={isSuccess ? styles.alertIconSuccess : styles.alertIconError}
+          >
+            <Ionicons
+              name={isSuccess ? "checkmark" : "close"}
+              size={36}
+              color={COLORS.white}
+            />
+          </View>
+          <Text style={styles.alertTitle}>
+            {isSuccess ? "결제 완료" : "결제 실패"}
+          </Text>
+          <Text style={styles.alertMessage}>{message}</Text>
+          <TouchableOpacity
+            style={styles.alertButton}
+            onPress={onClose}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.alertButtonText}>확인</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+    </View>
+  );
+}
+
+interface PaymentSliderProps {
+  isInsufficientBalance: boolean;
+  slideMaxWidth: number;
+  onSlideComplete: () => void;
+  disabled: boolean;
+}
+
+function PaymentSlider({
+  isInsufficientBalance,
+  slideMaxWidth,
+  onSlideComplete,
+  disabled,
+}: PaymentSliderProps) {
+  const slideAnimation = useSharedValue(0);
+  const isDragging = useSharedValue(false);
+
+  const slideProgress = useMemo(
+    () =>
+      interpolate(
+        slideAnimation.value,
+        [0, slideMaxWidth],
+        [0, 1],
+        Extrapolation.CLAMP
+      ),
+    [slideAnimation, slideMaxWidth]
+  );
+
+  const thumbStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: slideAnimation.value }],
+    };
+  });
+
+  const progressStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: -slideMaxWidth / 2 },
+        { scaleX: slideProgress },
+        { translateX: slideMaxWidth / 2 },
+      ],
+    };
+  });
+
+  const handleGestureEvent = useCallback(
+    (event: { nativeEvent: { locationX: number } }) => {
+      const { locationX } = event.nativeEvent;
+
+      if (isInsufficientBalance || disabled) return;
+
+      if (locationX >= 0 && locationX <= slideMaxWidth) {
+        slideAnimation.value = locationX;
+
+        if (locationX >= slideMaxWidth * 0.8 && !isDragging.value) {
+          slideAnimation.value = withSpring(slideMaxWidth, {
+            damping: 20,
+            stiffness: 200,
+          });
+          runOnJS(onSlideComplete)();
+        }
+      }
+    },
+    [
+      isInsufficientBalance,
+      disabled,
+      slideMaxWidth,
+      slideAnimation,
+      isDragging,
+      onSlideComplete,
+    ]
+  );
+
+  const handleTouchStart = useCallback(() => {
+    if (isInsufficientBalance || disabled) return;
+    isDragging.value = true;
+  }, [isInsufficientBalance, disabled, isDragging]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (isInsufficientBalance || disabled) return;
+
+    if (slideAnimation.value < slideMaxWidth * 0.8) {
+      slideAnimation.value = withSpring(0);
+    }
+
+    isDragging.value = false;
+  }, [
+    isInsufficientBalance,
+    disabled,
+    slideAnimation,
+    slideMaxWidth,
+    isDragging,
+  ]);
+
+  useEffect(() => {
+    if (!disabled) {
+      slideAnimation.value = withSpring(0);
+      isDragging.value = false;
+    }
+  }, [disabled, slideAnimation, isDragging]);
+
+  return (
+    <View style={styles.sliderContainer}>
+      <View
+        style={[
+          styles.sliderTrack,
+          isInsufficientBalance && styles.sliderTrackDisabled,
+        ]}
+      >
+        <Animated.View style={[styles.sliderProgress, progressStyle]} />
+        <Text style={styles.sliderText}>
+          {isInsufficientBalance
+            ? "잔액이 부족합니다"
+            : "오른쪽으로 밀어서 결제하기"}
+        </Text>
+      </View>
+
+      <Animated.View
+        style={[
+          styles.sliderThumb,
+          isInsufficientBalance && styles.sliderThumbDisabled,
+          thumbStyle,
+        ]}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleGestureEvent}
+        onTouchEnd={handleTouchEnd}
+      >
+        <Ionicons
+          name={isInsufficientBalance ? "close" : "arrow-forward"}
+          size={24}
+          color={COLORS.white}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+function LoadingState() {
+  return (
+    <View style={styles.container}>
+      <View style={styles.statusBarFill} />
+      <StatusBar style="dark" />
+      <View style={styles.loadingContainer}>
+        <MotiView
+          from={{ scale: 0.8, opacity: 0.5 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "timing", duration: 300 }}
+        >
+          <ActivityIndicator size="large" color={COLORS.primary600} />
+        </MotiView>
+        <MotiView
+          from={{ opacity: 0, translateY: 10 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: "timing", duration: 300, delay: 100 }}
+        >
+          <Text style={styles.loadingText}>결제 정보를 불러오는 중...</Text>
+        </MotiView>
+      </View>
+    </View>
+  );
+}
+
+function ErrorState({
+  error,
+  onRetry,
+}: {
+  error: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <View style={styles.container}>
+      <View style={styles.statusBarFill} />
+      <StatusBar style="dark" />
+      <MotiView
+        style={styles.errorContainer}
+        from={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: "timing", duration: 300 }}
+      >
+        <Ionicons
+          name="alert-circle-outline"
+          size={48}
+          color={COLORS.danger500}
+        />
+        <Text style={styles.errorText}>
+          {error || "결제 정보를 불러올 수 없습니다"}
+        </Text>
+        <View style={styles.errorButtonContainer}>
+          {onRetry && (
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={onRetry}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.errorBackButton}
+            onPress={() => router.back()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.backButtonText}>돌아가기</Text>
+          </TouchableOpacity>
+        </View>
+      </MotiView>
+    </View>
+  );
+}
 
 export default function PaymentScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [showErrorAlert, setShowErrorAlert] = useState(false);
-  const alertOpacity = useRef(new Animated.Value(0)).current;
-  const windowWidth = Dimensions.get("window").width;
-
-  const slideAnimation = useRef(new Animated.Value(0)).current;
-  const [sliding, setSliding] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(
+    "결제 처리 중 오류가 발생했습니다."
+  );
   const [slideCompleted, setSlideCompleted] = useState(false);
+
+  const {
+    balance: userBalance,
+    isLoading: isBalanceLoading,
+    fetchBalance,
+    refreshBalance,
+  } = useBalanceStore();
+
+  const windowWidth = Dimensions.get("window").width;
+  const slideMaxWidth = useMemo(
+    () => windowWidth - 28 * 2 - SLIDER_THUMB_SIZE,
+    [windowWidth]
+  );
 
   const {
     loading,
@@ -54,28 +346,10 @@ export default function PaymentScreen() {
     resetState,
   } = usePaymentStore();
 
-  const slideMaxWidth = useMemo(
-    () => windowWidth - 28 * 2 - SLIDER_THUMB_SIZE,
-    [windowWidth]
-  );
-
-  const fetchPaymentRequest = useCallback(async () => {
-    if (!token) return;
-
-    try {
-      setLoading(true);
-      setError("");
-
-      const response = await api.get(`/payments/requests?token=${token}`);
-      setPaymentRequest(response.data);
-
-      await fetchOrderDetails(response.data.orderId);
-    } catch (err) {
-      setError("결제 정보를 불러오는데 실패했습니다");
-    } finally {
-      setLoading(false);
-    }
-  }, [token, setLoading, setError, setPaymentRequest]);
+  const isInsufficientBalance = useMemo(() => {
+    if (!order || userBalance === null) return true;
+    return userBalance < order.totalAmount;
+  }, [order, userBalance]);
 
   const fetchOrderDetails = useCallback(
     async (orderId: number) => {
@@ -89,118 +363,99 @@ export default function PaymentScreen() {
     [setOrder, setError]
   );
 
-  const handleConfirmPayment = useCallback(async () => {
-    if (!token || confirming) return;
+  const fetchPaymentRequest = useCallback(async () => {
+    if (!token) return;
 
     try {
+      setLoading(true);
+      setError("");
+
+      const response = await api.get(`/payments/requests?token=${token}`);
+      setPaymentRequest(response.data);
+
+      await fetchOrderDetails(response.data.orderId);
+      await fetchBalance(); // Zustand store의 fetchBalance 사용
+    } catch (err) {
+      setError("결제 정보를 불러오는데 실패했습니다");
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    token,
+    setLoading,
+    setError,
+    setPaymentRequest,
+    fetchBalance,
+    fetchOrderDetails,
+  ]);
+
+  const showAlert = useCallback((isSuccess: boolean, message: string) => {
+    if (isSuccess) {
+      setShowSuccessAlert(true);
+    } else {
+      setErrorMessage(message);
+      setShowErrorAlert(true);
+    }
+  }, []);
+
+  const closeSuccessAlert = useCallback(() => {
+    setShowSuccessAlert(false);
+    router.push("/");
+  }, []);
+
+  const closeErrorAlert = useCallback(() => {
+    setShowErrorAlert(false);
+    setSlideCompleted(false);
+  }, []);
+
+  const handleConfirmPayment = useCallback(async () => {
+    if (!token || confirming || !order || userBalance === null) return;
+
+    try {
+      if (isInsufficientBalance) {
+        showAlert(false, "잔액이 부족합니다.");
+        return;
+      }
+
       setConfirming(true);
       await api.post("/payments/requests/confirm", { token });
-      showSuccess();
-    } catch (err) {
-      showError();
+
+      // 결제 성공 후 잔액 업데이트
+      await refreshBalance();
+
+      showAlert(true, "결제가 성공적으로 완료되었습니다.");
+    } catch (err: unknown) {
+      const errorResponse = err as { response?: { data?: { code?: string } } };
+      const errorCode = errorResponse.response?.data?.code;
+      let message = "결제 처리 중 오류가 발생했습니다.";
+
+      if (errorCode === "INSUFFICIENT_BALANCE") {
+        message = "잔액이 부족합니다.";
+        // 잔액 부족 오류 시에도 잔액 새로고침
+        refreshBalance();
+      } else if (errorCode === "ORDER_NOT_PENDING") {
+        message = "이미 처리된 주문입니다.";
+      }
+
+      showAlert(false, message);
     } finally {
       setConfirming(false);
     }
-  }, [token, confirming, setConfirming]);
+  }, [
+    token,
+    confirming,
+    order,
+    userBalance,
+    isInsufficientBalance,
+    showAlert,
+    setConfirming,
+    refreshBalance,
+  ]);
 
-  const showSuccess = useCallback(() => {
-    setShowSuccessAlert(true);
-    Animated.timing(alertOpacity, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [alertOpacity]);
-
-  const showError = useCallback(() => {
-    setShowErrorAlert(true);
-    Animated.timing(alertOpacity, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [alertOpacity]);
-
-  const closeSuccessAlert = useCallback(() => {
-    Animated.timing(alertOpacity, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowSuccessAlert(false);
-      router.push("/");
-    });
-  }, [alertOpacity]);
-
-  const closeErrorAlert = useCallback(() => {
-    Animated.timing(alertOpacity, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowErrorAlert(false);
-      setSlideCompleted(false);
-      slideAnimation.setValue(0);
-      setSliding(false);
-    });
-  }, [alertOpacity, slideAnimation]);
-
-  const slideProgress = useMemo(
-    () =>
-      slideAnimation.interpolate({
-        inputRange: [0, slideMaxWidth],
-        outputRange: [0, 1],
-        extrapolate: "clamp",
-      }),
-    [slideAnimation, slideMaxWidth]
-  );
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => !confirming && !slideCompleted,
-        onPanResponderGrant: () => {
-          setSliding(true);
-        },
-        onPanResponderMove: (_, gestureState) => {
-          const { dx } = gestureState;
-
-          if (dx > 0 && dx <= slideMaxWidth) {
-            slideAnimation.setValue(dx);
-          }
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          const { dx } = gestureState;
-
-          if (dx >= slideMaxWidth * 0.8) {
-            Animated.timing(slideAnimation, {
-              toValue: slideMaxWidth,
-              duration: 100,
-              useNativeDriver: true,
-            }).start(() => {
-              setSlideCompleted(true);
-              handleConfirmPayment();
-            });
-          } else {
-            Animated.timing(slideAnimation, {
-              toValue: 0,
-              duration: 200,
-              useNativeDriver: true,
-            }).start(() => {
-              setSliding(false);
-            });
-          }
-        },
-      }),
-    [
-      slideAnimation,
-      slideMaxWidth,
-      confirming,
-      slideCompleted,
-      handleConfirmPayment,
-    ]
-  );
+  const handleSlideComplete = useCallback(() => {
+    setSlideCompleted(true);
+    handleConfirmPayment();
+  }, [handleConfirmPayment]);
 
   useEffect(() => {
     if (!token) {
@@ -210,48 +465,26 @@ export default function PaymentScreen() {
 
     fetchPaymentRequest();
 
+    // 주기적으로 잔액 정보 갱신 (선택 사항)
+    const balanceRefreshInterval = setInterval(() => {
+      refreshBalance();
+    }, 30000); // 30초마다 갱신
+
     return () => {
+      clearInterval(balanceRefreshInterval);
       resetState();
     };
-  }, [token, fetchPaymentRequest, resetState, setError]);
+  }, [token, fetchPaymentRequest, resetState, setError, refreshBalance]);
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.statusBarFill} />
-        <StatusBar style="dark" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary600} />
-          <Text style={styles.loadingText}>결제 정보를 불러오는 중...</Text>
-        </View>
-      </View>
-    );
+  // 통합 로딩 상태 확인
+  const isLoading = loading || isBalanceLoading;
+
+  if (isLoading) {
+    return <LoadingState />;
   }
 
-  if (error || !order || !paymentRequest) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.statusBarFill} />
-        <StatusBar style="dark" />
-        <View style={styles.errorContainer}>
-          <Ionicons
-            name="alert-circle-outline"
-            size={48}
-            color={COLORS.danger500}
-          />
-          <Text style={styles.errorText}>
-            {error || "결제 정보를 불러올 수 없습니다"}
-          </Text>
-          <TouchableOpacity
-            style={styles.errorBackButton}
-            onPress={() => router.back()}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.backButtonText}>돌아가기</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
+  if (error || !order || !paymentRequest || userBalance === null) {
+    return <ErrorState error={error} onRetry={fetchPaymentRequest} />;
   }
 
   return (
@@ -278,20 +511,30 @@ export default function PaymentScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.card}>
+          <MotiView
+            style={styles.card}
+            from={{ opacity: 0, translateY: 10 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ type: "timing", duration: 300 }}
+          >
             <View style={styles.boothSection}>
               <Text style={styles.boothName}>{order.booth.name}</Text>
               <Text style={styles.orderNumber}>#{order.id}</Text>
             </View>
-          </View>
+          </MotiView>
 
-          <View style={styles.card}>
+          <MotiView
+            style={styles.card}
+            from={{ opacity: 0, translateY: 10 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ type: "timing", duration: 300, delay: 100 }}
+          >
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>주문 내역</Text>
             </View>
 
             {order.items.map((item, index) => (
-              <View key={index} style={styles.orderItem}>
+              <View key={`item-${index}`} style={styles.orderItem}>
                 <View style={styles.orderItemMain}>
                   <Text style={styles.itemName}>{item.product.name}</Text>
                   <Text style={styles.itemPrice}>
@@ -303,9 +546,14 @@ export default function PaymentScreen() {
                 </Text>
               </View>
             ))}
-          </View>
+          </MotiView>
 
-          <View style={styles.card}>
+          <MotiView
+            style={styles.card}
+            from={{ opacity: 0, translateY: 10 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ type: "timing", duration: 300, delay: 200 }}
+          >
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>결제 정보</Text>
             </View>
@@ -323,10 +571,27 @@ export default function PaymentScreen() {
                 {order.totalAmount.toLocaleString()}원
               </Text>
             </View>
-          </View>
+
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>내 잔액</Text>
+              <Text
+                style={[
+                  styles.totalAmount,
+                  isInsufficientBalance && styles.insufficientBalance,
+                ]}
+              >
+                {userBalance.toLocaleString()}원
+              </Text>
+            </View>
+          </MotiView>
         </ScrollView>
 
-        <View style={styles.footer}>
+        <MotiView
+          style={styles.footer}
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: "timing", duration: 300, delay: 300 }}
+        >
           {slideCompleted || confirming ? (
             <View
               style={[
@@ -337,82 +602,29 @@ export default function PaymentScreen() {
               <ActivityIndicator color={COLORS.white} size="small" />
             </View>
           ) : (
-            <View style={styles.sliderContainer}>
-              <View style={styles.sliderTrack}>
-                <Animated.View
-                  style={[
-                    styles.sliderProgress,
-                    {
-                      transform: [
-                        { translateX: -slideMaxWidth / 2 },
-                        { scaleX: slideProgress },
-                        { translateX: slideMaxWidth / 2 },
-                      ],
-                    },
-                  ]}
-                />
-                <Text style={styles.sliderText}>
-                  오른쪽으로 밀어서 결제하기
-                </Text>
-              </View>
-
-              <Animated.View
-                style={[
-                  styles.sliderThumb,
-                  {
-                    transform: [{ translateX: slideAnimation }],
-                  },
-                ]}
-                {...panResponder.panHandlers}
-              >
-                <Ionicons name="arrow-forward" size={24} color={COLORS.white} />
-              </Animated.View>
-            </View>
+            <PaymentSlider
+              isInsufficientBalance={isInsufficientBalance}
+              slideMaxWidth={slideMaxWidth}
+              onSlideComplete={handleSlideComplete}
+              disabled={confirming}
+            />
           )}
-        </View>
+        </MotiView>
       </View>
 
-      <Modal visible={showSuccessAlert} transparent={true} animationType="none">
-        <Animated.View style={[styles.alertOverlay, { opacity: alertOpacity }]}>
-          <View style={styles.alertContainer}>
-            <View style={styles.alertIconSuccess}>
-              <Ionicons name="checkmark" size={36} color={COLORS.white} />
-            </View>
-            <Text style={styles.alertTitle}>결제 완료</Text>
-            <Text style={styles.alertMessage}>
-              결제가 성공적으로 완료되었습니다.
-            </Text>
-            <TouchableOpacity
-              style={styles.alertButton}
-              onPress={closeSuccessAlert}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.alertButtonText}>확인</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </Modal>
+      <PaymentAlert
+        visible={showSuccessAlert}
+        isSuccess={true}
+        message="결제가 성공적으로 완료되었습니다."
+        onClose={closeSuccessAlert}
+      />
 
-      <Modal visible={showErrorAlert} transparent={true} animationType="none">
-        <Animated.View style={[styles.alertOverlay, { opacity: alertOpacity }]}>
-          <View style={styles.alertContainer}>
-            <View style={styles.alertIconError}>
-              <Ionicons name="close" size={36} color={COLORS.white} />
-            </View>
-            <Text style={styles.alertTitle}>결제 실패</Text>
-            <Text style={styles.alertMessage}>
-              결제 처리 중 오류가 발생했습니다.
-            </Text>
-            <TouchableOpacity
-              style={styles.alertButton}
-              onPress={closeErrorAlert}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.alertButtonText}>확인</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </Modal>
+      <PaymentAlert
+        visible={showErrorAlert}
+        isSuccess={false}
+        message={errorMessage}
+        onClose={closeErrorAlert}
+      />
     </View>
   );
 }
@@ -451,8 +663,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     color: COLORS.text,
     marginLeft: 8,
     lineHeight: 24,
@@ -481,11 +693,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   boothName: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
-    fontWeight: "600",
     color: COLORS.text,
   },
   orderNumber: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
     color: COLORS.textSecondary,
   },
@@ -494,8 +707,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   sectionTitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
-    fontWeight: "600",
     color: COLORS.text,
   },
   orderItem: {
@@ -509,18 +722,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   itemName: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 15,
-    fontWeight: "500",
     color: COLORS.text,
     flex: 1,
     marginRight: 8,
   },
   itemPrice: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     color: COLORS.text,
   },
   itemSubtext: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
     color: COLORS.textSecondary,
   },
@@ -532,18 +746,22 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   infoLabel: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 15,
     color: COLORS.textSecondary,
   },
   infoValue: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 15,
-    fontWeight: "500",
     color: COLORS.text,
   },
   totalAmount: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 18,
-    fontWeight: "700",
     color: COLORS.primary600,
+  },
+  insufficientBalance: {
+    color: COLORS.danger500,
   },
   footer: {
     padding: 14,
@@ -574,6 +792,11 @@ const styles = StyleSheet.create({
     position: "relative",
     overflow: "hidden",
   },
+  sliderTrackDisabled: {
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
   sliderProgress: {
     position: "absolute",
     left: 0,
@@ -596,10 +819,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 2,
   },
+  sliderThumbDisabled: {
+    backgroundColor: COLORS.danger500,
+  },
   sliderText: {
+    fontFamily: "Pretendard-SemiBold",
     color: COLORS.textSecondary,
     fontSize: 15,
-    fontWeight: "600",
     textAlign: "center",
     zIndex: 2,
   },
@@ -610,6 +836,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   loadingText: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 16,
     marginTop: 16,
     color: COLORS.text,
@@ -622,11 +849,16 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   errorText: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 16,
     color: COLORS.danger500,
     marginTop: 16,
     marginBottom: 24,
     textAlign: "center",
+  },
+  errorButtonContainer: {
+    flexDirection: "row",
+    gap: 12,
   },
   errorBackButton: {
     backgroundColor: COLORS.primary600,
@@ -634,10 +866,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 16,
   },
+  retryButton: {
+    backgroundColor: COLORS.white,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.primary600,
+  },
+  retryButtonText: {
+    fontFamily: "Pretendard-SemiBold",
+    color: COLORS.primary600,
+    fontSize: 16,
+  },
   backButtonText: {
+    fontFamily: "Pretendard-SemiBold",
     color: COLORS.white,
     fontSize: 16,
-    fontWeight: "600",
+  },
+  modalContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
   },
   alertOverlay: {
     flex: 1,
@@ -673,12 +926,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   alertTitle: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 18,
-    fontWeight: "700",
     color: COLORS.text,
     marginBottom: 8,
   },
   alertMessage: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 15,
     color: COLORS.textSecondary,
     textAlign: "center",
@@ -692,8 +946,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   alertButtonText: {
+    fontFamily: "Pretendard-SemiBold",
     color: COLORS.white,
     fontSize: 16,
-    fontWeight: "600",
   },
 });

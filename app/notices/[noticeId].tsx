@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -6,17 +6,21 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import api from "@/libs/api";
-import { COLORS } from "@/constants/colors";
+import { useQuery } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
+import { MotiView } from "moti";
 import dayjs from "dayjs";
-import { Skeleton } from "@/components/Skeleton";
 import Markdown from "react-native-markdown-display";
 import "dayjs/locale/ko";
+
+import api from "@/libs/api";
+import { COLORS } from "@/constants/colors";
+import { Skeleton } from "@/components/Skeleton";
 
 dayjs.locale("ko");
 
@@ -30,9 +34,8 @@ interface Notice {
   createdAt: string;
 }
 
-const NoticeSkeleton = () => (
-  <View style={styles.contentWrapper}>
-    <View style={styles.bgExtender} />
+function NoticeSkeleton() {
+  return (
     <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}
@@ -52,146 +55,202 @@ const NoticeSkeleton = () => (
         <Skeleton width="85%" height={16} style={{ marginBottom: 8 }} />
       </View>
     </ScrollView>
-  </View>
-);
+  );
+}
+
+function ErrorContent({
+  message,
+  onBack,
+}: {
+  message: string;
+  onBack: () => void;
+}) {
+  return (
+    <MotiView
+      style={styles.errorContainer}
+      from={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "timing", duration: 300 }}
+    >
+      <Ionicons name="alert-circle-outline" size={64} color={COLORS.gray300} />
+      <Text style={styles.errorText}>{message}</Text>
+      <TouchableOpacity
+        style={styles.errorBackButton}
+        onPress={onBack}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.backButtonText}>돌아가기</Text>
+      </TouchableOpacity>
+    </MotiView>
+  );
+}
 
 export default function NoticeDetailScreen() {
   const { noticeId } = useLocalSearchParams<{ noticeId: string }>();
-  const [notice, setNotice] = useState<Notice | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  const fetchNoticeDetail = useCallback(async () => {
-    if (!noticeId) {
-      setError("공지사항을 찾을 수 없습니다");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
+  const {
+    data: notice,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["notice", noticeId],
+    queryFn: async () => {
+      if (!noticeId) throw new Error("공지사항을 찾을 수 없습니다");
       const { data } = await api.get<Notice>(`/notices/${noticeId}`);
-      setNotice(data);
-      setError("");
-    } catch (err) {
-      setError("공지사항을 불러오는데 실패했습니다");
-    } finally {
-      setLoading(false);
-    }
-  }, [noticeId]);
+      return data;
+    },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+    retry: 1,
+  });
 
-  useEffect(() => {
-    fetchNoticeDetail();
-  }, [fetchNoticeDetail]);
+  const errorMessage =
+    error instanceof Error
+      ? error.message
+      : "공지사항을 불러오는데 실패했습니다";
+
+  const handleBack = useCallback(() => router.back(), []);
+
+  const handleRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   const formatDate = useCallback((dateString: string): string => {
     return dayjs(dateString).format("YYYY.MM.DD");
   }, []);
 
-  const renderErrorContent = useCallback(
-    (errorMessage: string) => (
-      <View style={styles.errorContainer}>
-        <Ionicons
-          name="alert-circle-outline"
-          size={64}
-          color={COLORS.gray300}
-        />
-        <Text style={styles.errorText}>{errorMessage}</Text>
-      </View>
-    ),
+  const markdownStyles = useMemo(
+    () => ({
+      body: {
+        color: COLORS.text,
+        fontFamily: "Pretendard-Medium",
+        fontSize: 15,
+      },
+      paragraph: {
+        marginBottom: 16,
+        lineHeight: 22,
+        letterSpacing: -0.1,
+      },
+      heading1: {
+        fontFamily: "Pretendard-Bold",
+        fontSize: 20,
+        marginTop: 16,
+        marginBottom: 8,
+        color: COLORS.text,
+      },
+      heading2: {
+        fontFamily: "Pretendard-Bold",
+        fontSize: 18,
+        marginTop: 16,
+        marginBottom: 8,
+        color: COLORS.text,
+      },
+      heading3: {
+        fontFamily: "Pretendard-SemiBold",
+        fontSize: 16,
+        marginTop: 14,
+        marginBottom: 8,
+        color: COLORS.text,
+      },
+      link: {
+        color: COLORS.primary600,
+      },
+      blockquote: {
+        borderLeftWidth: 4,
+        borderLeftColor: COLORS.gray300,
+        paddingLeft: 12,
+        marginLeft: 0,
+        marginRight: 0,
+      },
+      code_block: {
+        fontFamily: "monospace",
+        backgroundColor: COLORS.gray100,
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 16,
+      },
+      bullet_list: {
+        marginBottom: 16,
+      },
+      ordered_list: {
+        marginBottom: 16,
+      },
+    }),
     []
   );
 
-  // 마크다운 스타일 설정
-  const markdownStyles = {
-    body: {
-      color: COLORS.text,
-      fontFamily: "Pretendard-Medium",
-      fontSize: 15,
-    },
-    paragraph: {
-      marginBottom: 16,
-      lineHeight: 22,
-      letterSpacing: -0.1,
-    },
-    heading1: {
-      fontFamily: "Pretendard-Bold",
-      fontSize: 20,
-      marginTop: 16,
-      marginBottom: 8,
-      color: COLORS.text,
-    },
-    heading2: {
-      fontFamily: "Pretendard-Bold",
-      fontSize: 18,
-      marginTop: 16,
-      marginBottom: 8,
-      color: COLORS.text,
-    },
-    heading3: {
-      fontFamily: "Pretendard-SemiBold",
-      fontSize: 16,
-      marginTop: 14,
-      marginBottom: 8,
-      color: COLORS.text,
-    },
-    link: {
-      color: COLORS.primary600,
-    },
-    blockquote: {
-      borderLeftWidth: 4,
-      borderLeftColor: COLORS.gray300,
-      paddingLeft: 12,
-      marginLeft: 0,
-      marginRight: 0,
-    },
-    code_block: {
-      fontFamily: "monospace",
-      backgroundColor: COLORS.gray100,
-      padding: 12,
-      borderRadius: 8,
-      marginBottom: 16,
-    },
-    bullet_list: {
-      marginBottom: 16,
-    },
-    ordered_list: {
-      marginBottom: 16,
-    },
-  };
+  // Show pull-to-refresh loading indicator only during data refreshing (not initial loading)
+  const isPullToRefreshing = isFetching && !isLoading;
 
   return (
     <View style={styles.container}>
-      <View style={styles.statusBarFill} />
       <StatusBar style="dark" />
 
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-          >
-            <Ionicons name="chevron-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>공지사항</Text>
-          <View style={{ width: 24 }} />
-        </View>
-      </SafeAreaView>
+      {/* Fixed header that won't disappear or move */}
+      <View style={styles.fixedHeaderContainer}>
+        <View style={styles.statusBarFill} />
+        <SafeAreaView style={styles.safeArea} edges={["top"]}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBack}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>공지사항</Text>
+            <View style={styles.rightButtonContainer}>
+              {!isLoading && !error && notice && (
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={handleRefresh}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name="refresh-outline"
+                    size={20}
+                    color={COLORS.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
+              {(isLoading || error || !notice) && (
+                <View style={styles.placeholderButton} />
+              )}
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
 
-      {loading ? (
-        <NoticeSkeleton />
-      ) : error || !notice ? (
-        renderErrorContent(error || "공지사항을 불러올 수 없습니다")
-      ) : (
-        <View style={styles.contentWrapper}>
-          <View style={styles.bgExtender} />
+      <View style={styles.contentWrapper}>
+        <View style={styles.bgExtender} />
+
+        {isLoading ? (
+          <NoticeSkeleton />
+        ) : error || !notice ? (
+          <ErrorContent message={errorMessage} onBack={handleBack} />
+        ) : (
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isPullToRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={COLORS.primary500}
+                colors={[COLORS.primary500]}
+                progressBackgroundColor={COLORS.white}
+              />
+            }
           >
-            <View style={styles.card}>
+            <MotiView
+              style={styles.card}
+              from={{ opacity: 0, translateY: 5 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ type: "timing", duration: 250 }}
+            >
               <View style={styles.cardHeader}>
                 <Text style={styles.dateText}>
                   {formatDate(notice.createdAt)}
@@ -207,11 +266,17 @@ export default function NoticeDetailScreen() {
 
               <View style={styles.divider} />
 
-              <Markdown style={markdownStyles}>{notice.content}</Markdown>
-            </View>
+              <MotiView
+                from={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ type: "timing", duration: 300, delay: 100 }}
+              >
+                <Markdown style={markdownStyles}>{notice.content}</Markdown>
+              </MotiView>
+            </MotiView>
           </ScrollView>
-        </View>
-      )}
+        )}
+      </View>
     </View>
   );
 }
@@ -221,6 +286,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
+  fixedHeaderContainer: {
+    width: "100%",
+    backgroundColor: COLORS.white,
+    zIndex: 10,
+  },
   statusBarFill: {
     position: "absolute",
     top: 0,
@@ -228,11 +298,11 @@ const styles = StyleSheet.create({
     right: 0,
     height: Platform.OS === "ios" ? 44 : 24,
     backgroundColor: COLORS.white,
-    zIndex: 1,
+    zIndex: 11,
   },
   safeArea: {
     backgroundColor: COLORS.white,
-    zIndex: 2,
+    zIndex: 12,
   },
   header: {
     flexDirection: "row",
@@ -249,11 +319,27 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: COLORS.text,
   },
+  rightButtonContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   backButton: {
     width: 24,
     height: 24,
     justifyContent: "center",
     alignItems: "center",
+  },
+  refreshButton: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  placeholderButton: {
+    width: 24,
+    height: 24,
   },
   contentWrapper: {
     flex: 1,
@@ -275,7 +361,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 10,
     paddingTop: 10,
-    paddingBottom: 100,
+    paddingBottom: 30,
   },
   card: {
     backgroundColor: COLORS.white,
@@ -331,5 +417,17 @@ const styles = StyleSheet.create({
     color: COLORS.gray500,
     textAlign: "center",
     marginTop: 16,
+    marginBottom: 24,
+  },
+  errorBackButton: {
+    backgroundColor: COLORS.primary600,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+  },
+  backButtonText: {
+    fontFamily: "Pretendard-SemiBold",
+    color: COLORS.white,
+    fontSize: 16,
   },
 });
