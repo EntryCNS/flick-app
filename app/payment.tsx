@@ -6,8 +6,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  Dimensions,
+  RefreshControl,
   Platform,
+  Alert,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,58 +18,53 @@ import { usePaymentStore } from "@/stores/payment";
 import { useBalanceStore } from "@/stores/balance";
 import api from "@/libs/api";
 import { StatusBar } from "expo-status-bar";
+import * as LocalAuthentication from "expo-local-authentication";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSpring,
-  runOnJS,
   interpolate,
   Extrapolation,
 } from "react-native-reanimated";
 import { MotiView } from "moti";
 
 const BACKGROUND_COLOR = "#F5F6F8";
-const SLIDER_THUMB_SIZE = 52;
 
-interface AlertProps {
+function PaymentAlert({
+  visible,
+  isSuccess,
+  message,
+  onClose,
+}: {
   visible: boolean;
   isSuccess: boolean;
   message: string;
   onClose: () => void;
-}
-
-function PaymentAlert({ visible, isSuccess, message, onClose }: AlertProps) {
+}) {
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    if (visible) {
-      opacity.value = withTiming(1, { duration: 300 });
-    } else {
-      opacity.value = withTiming(0, { duration: 200 });
-    }
+    opacity.value = withTiming(visible ? 1 : 0, {
+      duration: visible ? 300 : 200,
+    });
   }, [visible, opacity]);
 
-  const overlayStyle = useAnimatedStyle(() => {
-    return {
-      opacity: opacity.value,
-    };
-  });
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
 
-  const containerStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        {
-          scale: interpolate(
-            opacity.value,
-            [0, 1],
-            [0.9, 1],
-            Extrapolation.CLAMP
-          ),
-        },
-      ],
-    };
-  });
+  const containerStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scale: interpolate(
+          opacity.value,
+          [0, 1],
+          [0.9, 1],
+          Extrapolation.CLAMP
+        ),
+      },
+    ],
+  }));
 
   if (!visible) return null;
 
@@ -97,141 +93,6 @@ function PaymentAlert({ visible, isSuccess, message, onClose }: AlertProps) {
             <Text style={styles.alertButtonText}>확인</Text>
           </TouchableOpacity>
         </Animated.View>
-      </Animated.View>
-    </View>
-  );
-}
-
-interface PaymentSliderProps {
-  isInsufficientBalance: boolean;
-  slideMaxWidth: number;
-  onSlideComplete: () => void;
-  disabled: boolean;
-}
-
-function PaymentSlider({
-  isInsufficientBalance,
-  slideMaxWidth,
-  onSlideComplete,
-  disabled,
-}: PaymentSliderProps) {
-  const slideAnimation = useSharedValue(0);
-  const isDragging = useSharedValue(false);
-
-  const slideProgress = useMemo(
-    () =>
-      interpolate(
-        slideAnimation.value,
-        [0, slideMaxWidth],
-        [0, 1],
-        Extrapolation.CLAMP
-      ),
-    [slideAnimation, slideMaxWidth]
-  );
-
-  const thumbStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: slideAnimation.value }],
-    };
-  });
-
-  const progressStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { translateX: -slideMaxWidth / 2 },
-        { scaleX: slideProgress },
-        { translateX: slideMaxWidth / 2 },
-      ],
-    };
-  });
-
-  const handleGestureEvent = useCallback(
-    (event: { nativeEvent: { locationX: number } }) => {
-      const { locationX } = event.nativeEvent;
-
-      if (isInsufficientBalance || disabled) return;
-
-      if (locationX >= 0 && locationX <= slideMaxWidth) {
-        slideAnimation.value = locationX;
-
-        if (locationX >= slideMaxWidth * 0.8 && !isDragging.value) {
-          slideAnimation.value = withSpring(slideMaxWidth, {
-            damping: 20,
-            stiffness: 200,
-          });
-          runOnJS(onSlideComplete)();
-        }
-      }
-    },
-    [
-      isInsufficientBalance,
-      disabled,
-      slideMaxWidth,
-      slideAnimation,
-      isDragging,
-      onSlideComplete,
-    ]
-  );
-
-  const handleTouchStart = useCallback(() => {
-    if (isInsufficientBalance || disabled) return;
-    isDragging.value = true;
-  }, [isInsufficientBalance, disabled, isDragging]);
-
-  const handleTouchEnd = useCallback(() => {
-    if (isInsufficientBalance || disabled) return;
-
-    if (slideAnimation.value < slideMaxWidth * 0.8) {
-      slideAnimation.value = withSpring(0);
-    }
-
-    isDragging.value = false;
-  }, [
-    isInsufficientBalance,
-    disabled,
-    slideAnimation,
-    slideMaxWidth,
-    isDragging,
-  ]);
-
-  useEffect(() => {
-    if (!disabled) {
-      slideAnimation.value = withSpring(0);
-      isDragging.value = false;
-    }
-  }, [disabled, slideAnimation, isDragging]);
-
-  return (
-    <View style={styles.sliderContainer}>
-      <View
-        style={[
-          styles.sliderTrack,
-          isInsufficientBalance && styles.sliderTrackDisabled,
-        ]}
-      >
-        <Animated.View style={[styles.sliderProgress, progressStyle]} />
-        <Text style={styles.sliderText}>
-          {isInsufficientBalance
-            ? "잔액이 부족합니다"
-            : "오른쪽으로 밀어서 결제하기"}
-        </Text>
-      </View>
-
-      <Animated.View
-        style={[
-          styles.sliderThumb,
-          isInsufficientBalance && styles.sliderThumbDisabled,
-          thumbStyle,
-        ]}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleGestureEvent}
-        onTouchEnd={handleTouchEnd}
-      >
-        <Ionicons
-          name={isInsufficientBalance ? "close" : "arrow-forward"}
-          size={24}
-          color={COLORS.white}
-        />
       </Animated.View>
     </View>
   );
@@ -317,7 +178,8 @@ export default function PaymentScreen() {
   const [errorMessage, setErrorMessage] = useState(
     "결제 처리 중 오류가 발생했습니다."
   );
-  const [slideCompleted, setSlideCompleted] = useState(false);
+  const [authenticating, setAuthenticating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const {
     balance: userBalance,
@@ -325,12 +187,6 @@ export default function PaymentScreen() {
     fetchBalance,
     refreshBalance,
   } = useBalanceStore();
-
-  const windowWidth = Dimensions.get("window").width;
-  const slideMaxWidth = useMemo(
-    () => windowWidth - 28 * 2 - SLIDER_THUMB_SIZE,
-    [windowWidth]
-  );
 
   const {
     loading,
@@ -356,7 +212,7 @@ export default function PaymentScreen() {
       try {
         const response = await api.get(`/orders/${orderId}`);
         setOrder(response.data);
-      } catch (err) {
+      } catch {
         setError("주문 정보를 불러오는데 실패했습니다");
       }
     },
@@ -374,8 +230,8 @@ export default function PaymentScreen() {
       setPaymentRequest(response.data);
 
       await fetchOrderDetails(response.data.orderId);
-      await fetchBalance(); // Zustand store의 fetchBalance 사용
-    } catch (err) {
+      await fetchBalance();
+    } catch {
       setError("결제 정보를 불러오는데 실패했습니다");
     } finally {
       setLoading(false);
@@ -389,6 +245,17 @@ export default function PaymentScreen() {
     fetchOrderDetails,
   ]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchPaymentRequest(), refreshBalance()]);
+    } catch {
+      setError("결제 정보를 갱신하는데 실패했습니다");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchPaymentRequest, refreshBalance, setError]);
+
   const showAlert = useCallback((isSuccess: boolean, message: string) => {
     if (isSuccess) {
       setShowSuccessAlert(true);
@@ -396,16 +263,6 @@ export default function PaymentScreen() {
       setErrorMessage(message);
       setShowErrorAlert(true);
     }
-  }, []);
-
-  const closeSuccessAlert = useCallback(() => {
-    setShowSuccessAlert(false);
-    router.push("/");
-  }, []);
-
-  const closeErrorAlert = useCallback(() => {
-    setShowErrorAlert(false);
-    setSlideCompleted(false);
   }, []);
 
   const handleConfirmPayment = useCallback(async () => {
@@ -419,10 +276,7 @@ export default function PaymentScreen() {
 
       setConfirming(true);
       await api.post("/payments/requests/confirm", { token });
-
-      // 결제 성공 후 잔액 업데이트
       await refreshBalance();
-
       showAlert(true, "결제가 성공적으로 완료되었습니다.");
     } catch (err: unknown) {
       const errorResponse = err as { response?: { data?: { code?: string } } };
@@ -431,7 +285,6 @@ export default function PaymentScreen() {
 
       if (errorCode === "INSUFFICIENT_BALANCE") {
         message = "잔액이 부족합니다.";
-        // 잔액 부족 오류 시에도 잔액 새로고침
         refreshBalance();
       } else if (errorCode === "ORDER_NOT_PENDING") {
         message = "이미 처리된 주문입니다.";
@@ -440,6 +293,7 @@ export default function PaymentScreen() {
       showAlert(false, message);
     } finally {
       setConfirming(false);
+      setAuthenticating(false);
     }
   }, [
     token,
@@ -452,10 +306,67 @@ export default function PaymentScreen() {
     refreshBalance,
   ]);
 
-  const handleSlideComplete = useCallback(() => {
-    setSlideCompleted(true);
-    handleConfirmPayment();
+  const confirmWithoutBiometrics = useCallback(() => {
+    Alert.alert(
+      "결제 확인",
+      "결제를 진행하시겠습니까?",
+      [
+        {
+          text: "취소",
+          style: "cancel",
+          onPress: () => setAuthenticating(false),
+        },
+        {
+          text: "확인",
+          onPress: handleConfirmPayment,
+        },
+      ],
+      { cancelable: false }
+    );
   }, [handleConfirmPayment]);
+
+  const handlePaymentButtonPress = useCallback(async () => {
+    if (isInsufficientBalance || confirming) return;
+
+    setAuthenticating(true);
+
+    try {
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+
+      if (compatible) {
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+
+        if (enrolled) {
+          const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: "결제를 위한 생체인증",
+            cancelLabel: "취소",
+            disableDeviceFallback: false,
+          });
+
+          if (result.success) {
+            handleConfirmPayment();
+          } else {
+            setAuthenticating(false);
+            if (result.error !== "user_cancel") {
+              Alert.alert("인증 실패", "생체 인증에 실패했습니다.");
+            }
+          }
+        } else {
+          confirmWithoutBiometrics();
+        }
+      } else {
+        confirmWithoutBiometrics();
+      }
+    } catch {
+      setAuthenticating(false);
+      Alert.alert("오류", "인증 과정에서 오류가 발생했습니다.");
+    }
+  }, [
+    isInsufficientBalance,
+    confirming,
+    handleConfirmPayment,
+    confirmWithoutBiometrics,
+  ]);
 
   useEffect(() => {
     if (!token) {
@@ -464,11 +375,7 @@ export default function PaymentScreen() {
     }
 
     fetchPaymentRequest();
-
-    // 주기적으로 잔액 정보 갱신 (선택 사항)
-    const balanceRefreshInterval = setInterval(() => {
-      refreshBalance();
-    }, 30000); // 30초마다 갱신
+    const balanceRefreshInterval = setInterval(refreshBalance, 30000);
 
     return () => {
       clearInterval(balanceRefreshInterval);
@@ -476,10 +383,9 @@ export default function PaymentScreen() {
     };
   }, [token, fetchPaymentRequest, resetState, setError, refreshBalance]);
 
-  // 통합 로딩 상태 확인
   const isLoading = loading || isBalanceLoading;
 
-  if (isLoading) {
+  if (isLoading && !refreshing) {
     return <LoadingState />;
   }
 
@@ -510,6 +416,14 @@ export default function PaymentScreen() {
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.primary600]}
+              tintColor={COLORS.primary600}
+            />
+          }
         >
           <MotiView
             style={styles.card}
@@ -592,23 +506,43 @@ export default function PaymentScreen() {
           animate={{ opacity: 1, translateY: 0 }}
           transition={{ type: "timing", duration: 300, delay: 300 }}
         >
-          {slideCompleted || confirming ? (
-            <View
-              style={[
-                styles.confirmButton,
-                confirming && styles.confirmButtonDisabled,
-              ]}
-            >
+          <TouchableOpacity
+            style={[
+              styles.paymentButton,
+              (isInsufficientBalance || confirming || authenticating) &&
+                styles.paymentButtonDisabled,
+            ]}
+            onPress={handlePaymentButtonPress}
+            disabled={isInsufficientBalance || confirming || authenticating}
+            activeOpacity={0.8}
+          >
+            {confirming || authenticating ? (
               <ActivityIndicator color={COLORS.white} size="small" />
-            </View>
-          ) : (
-            <PaymentSlider
-              isInsufficientBalance={isInsufficientBalance}
-              slideMaxWidth={slideMaxWidth}
-              onSlideComplete={handleSlideComplete}
-              disabled={confirming}
-            />
-          )}
+            ) : (
+              <View style={styles.buttonContent}>
+                {isInsufficientBalance ? (
+                  <Ionicons
+                    name="close"
+                    size={20}
+                    color={COLORS.white}
+                    style={styles.buttonIcon}
+                  />
+                ) : (
+                  <Ionicons
+                    name="finger-print"
+                    size={20}
+                    color={COLORS.white}
+                    style={styles.buttonIcon}
+                  />
+                )}
+                <Text style={styles.paymentButtonText}>
+                  {isInsufficientBalance
+                    ? "잔액이 부족합니다"
+                    : "생체인증으로 결제하기"}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </MotiView>
       </View>
 
@@ -616,14 +550,20 @@ export default function PaymentScreen() {
         visible={showSuccessAlert}
         isSuccess={true}
         message="결제가 성공적으로 완료되었습니다."
-        onClose={closeSuccessAlert}
+        onClose={() => {
+          setShowSuccessAlert(false);
+          router.push("/");
+        }}
       />
 
       <PaymentAlert
         visible={showErrorAlert}
         isSuccess={false}
         message={errorMessage}
-        onClose={closeErrorAlert}
+        onClose={() => {
+          setShowErrorAlert(false);
+          setAuthenticating(false);
+        }}
       />
     </View>
   );
@@ -768,66 +708,29 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: Platform.OS === "ios" ? 34 : 14,
   },
-  confirmButton: {
+  paymentButton: {
     backgroundColor: COLORS.primary600,
     borderRadius: 16,
     height: 52,
     justifyContent: "center",
     alignItems: "center",
   },
-  confirmButtonDisabled: {
+  paymentButtonDisabled: {
     opacity: 0.7,
+    backgroundColor: COLORS.gray400,
   },
-  sliderContainer: {
-    position: "relative",
-    height: 52,
-  },
-  sliderTrack: {
-    width: "100%",
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: "#E5E7EB",
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    overflow: "hidden",
-  },
-  sliderTrackDisabled: {
-    backgroundColor: "#F3F4F6",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  sliderProgress: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: "100%",
-    backgroundColor: "#D1DBF9",
-    transformOrigin: "left",
-    zIndex: 1,
-  },
-  sliderThumb: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    width: SLIDER_THUMB_SIZE,
-    height: SLIDER_THUMB_SIZE,
-    borderRadius: 16,
-    backgroundColor: COLORS.primary600,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 2,
-  },
-  sliderThumbDisabled: {
-    backgroundColor: COLORS.danger500,
-  },
-  sliderText: {
+  paymentButtonText: {
     fontFamily: "Pretendard-SemiBold",
-    color: COLORS.textSecondary,
-    fontSize: 15,
-    textAlign: "center",
-    zIndex: 2,
+    color: COLORS.white,
+    fontSize: 16,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
   loadingContainer: {
     flex: 1,
