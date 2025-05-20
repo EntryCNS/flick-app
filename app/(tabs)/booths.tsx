@@ -120,7 +120,7 @@ export default function BoothsScreen() {
   } = useQuery({
     queryKey: ["booths"],
     queryFn: fetchBooths,
-    staleTime: 60 * 1000, // 1분
+    staleTime: 60 * 1000,
   });
 
   const navigateToBoothDetail = useCallback((boothId: number) => {

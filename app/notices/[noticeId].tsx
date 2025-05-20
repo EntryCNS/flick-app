@@ -181,7 +181,6 @@ export default function NoticeDetailScreen() {
     []
   );
 
-  // Show pull-to-refresh loading indicator only during data refreshing (not initial loading)
   const isPullToRefreshing = isFetching && !isLoading;
 
   return (

@@ -59,26 +59,6 @@ export default function ServiceInfoScreen() {
         { label: "개발 및 운영", value: "동아리 CNS" },
       ],
     },
-    // {
-    //   title: "법적 정보",
-    //   items: [
-    //     {
-    //       label: "개인정보처리방침",
-    //       value: "바로가기",
-    //       isLink: true,
-    //     },
-    //     {
-    //       label: "이용약관",
-    //       value: "바로가기",
-    //       isLink: true,
-    //     },
-    //     {
-    //       label: "오픈소스 라이선스",
-    //       value: "바로가기",
-    //       isLink: true,
-    //     },
-    //   ],
-    // },
   ];
 
   return (

@@ -48,7 +48,7 @@ export default function QRScannerScreen() {
   const handleBarCodeScanned = ({ data }: BarcodeScanningResult) => {
     if (scanned) return;
     setScanned(true);
-    router.push({
+    router.replace({
       pathname: "/payment",
       params: { token: data },
     });
@@ -100,7 +100,7 @@ export default function QRScannerScreen() {
                 onPress={requestPermission}
                 activeOpacity={0.7}
               >
-                <Text style={styles.buttonText}>권한 허용하기</Text>
+                <Text style={styles.buttonText}>다음</Text>
               </TouchableOpacity>
             )}
           </View>

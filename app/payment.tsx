@@ -552,7 +552,7 @@ export default function PaymentScreen() {
         message="결제가 성공적으로 완료되었습니다."
         onClose={() => {
           setShowSuccessAlert(false);
-          router.push("/");
+          router.replace("/");
         }}
       />
 
